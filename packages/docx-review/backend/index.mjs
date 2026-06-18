@@ -215,7 +215,7 @@ async function runReviewPipeline(ctx, sourcePath, options = {}) {
   await ctx.tools.call('fs.write', { path: reportPath, content: reviewMarkdownReport(report, numberedComments, recon.dropped) })
 
   await ctx.progress.step('Writing Word comments')
-  await ctx.progress.progress(0.88, 'Creating reviewed DOCX copy')
+  await ctx.progress.progress(0.9, 'Creating reviewed DOCX copy')
   const docxAnnotation = await annotateWithRepair(ctx, sourcePath, reviewedDocxPath, numberedComments, markdown, reviewModel)
 
   const result = {

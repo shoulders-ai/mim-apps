@@ -83,10 +83,10 @@ const defaultReference = async ({ submit }) => {
 }
 
 // Drives the reconciler tool loop the way a real model would: group raw comments
-// by snippet, merge same-snippet groups, keep singletons, then submit the report.
+// by snippet, merge same-snippet groups, and keep singletons in one batched tool
+// call. The report is generated later from the reconciled comment list.
 const defaultReconcile = async ({ tools, opts, scenario }) => {
-  const decide = tools.find(tool => tool.name === 'decide_comment')
-  const submit = tools.find(tool => tool.name === 'submit_report')
+  const decide = tools.find(tool => tool.name === 'decide_comments')
   const content = typeof opts.messages[0].content === 'string' ? opts.messages[0].content : ''
   let raw = []
   try { raw = JSON.parse(content.split(/Raw comments[^\n]*\n/)[1] || '[]') } catch { raw = [] }
@@ -96,9 +96,10 @@ const defaultReconcile = async ({ tools, opts, scenario }) => {
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key).push(c)
   }
+  const decisions = []
   for (const group of groups.values()) {
     const ids = group.map(c => c.rawId)
-    await decide.execute({
+    decisions.push({
       action: ids.length > 1 ? 'merge' : 'keep',
       source_ids: ids,
       text_snippet: group[0].text_snippet,
@@ -106,7 +107,7 @@ const defaultReconcile = async ({ tools, opts, scenario }) => {
       severity: group[0].severity,
     })
   }
-  await submit.execute({ report: scenario.reportText ?? '## Peer Review Summary\n\nSolid paper, fix the stats.' })
+  await decide.execute({ decisions })
 }
 
 function makeCtx(scenario = {}) {
@@ -136,7 +137,7 @@ function makeCtx(scenario = {}) {
           if (scenario.repair) await scenario.repair({ submit: findTool(opts, 'submit_docx_anchor_repairs'), opts })
           return { text: '', usage: { input: 5, output: 5 } }
         }
-        if (findTool(opts, 'decide_comment') || findTool(opts, 'submit_report')) {
+        if (findTool(opts, 'decide_comments')) {
           const handler = scenario.reconcile ?? defaultReconcile
           await handler({ tools: opts.tools || [], opts, scenario })
           return { text: '', usage: { input: 40, output: 40 } }
@@ -145,6 +146,12 @@ function makeCtx(scenario = {}) {
           const text = scenario.gatekeeperText ??
             JSON.stringify({ eligible: true, domain_hint: 'health economics', reason: 'research paper' })
           return { text, usage: { input: 10, output: 5 } }
+        }
+        if (/peer-review summary/i.test(opts.system)) {
+          return {
+            text: scenario.reportText ?? '## Peer Review Summary\n\nSolid paper, fix the stats.',
+            usage: { input: 15, output: 8 },
+          }
         }
         return { text: '', usage: { input: 20, output: 20 } }
       },
@@ -182,9 +189,8 @@ function makeCtx(scenario = {}) {
   return { ctx, log }
 }
 
-// The report is now produced inside the reconciler (submit_report tool), so the
-// "report call" is the reconciler's callModel invocation.
-const reportCall = log => log.ai.find(call => (call.tools || []).some(tool => tool.name === 'submit_report'))
+const reconcileCall = log => log.ai.find(call => (call.tools || []).some(tool => tool.name === 'decide_comments'))
+const summaryCall = log => log.ai.find(call => !call.tools?.length && /peer-review summary/i.test(call.system || ''))
 const reviewerCall = (log, marker) => log.ai.find(call => (call.tools || []).some(tool => tool.name === 'submit_review') && marker.test(call.system))
 const reviewerPaperText = call => call.messages[0].content.filter(part => part.type === 'text').map(part => part.text).join('\n')
 
@@ -583,13 +589,14 @@ describe('reviewDocx pipeline', () => {
       author: 'Mim Review',
     })
 
-    // the reconciler saw the citation summary
-    expect(reportCall(log).messages[0].content).toContain('Reference/citation check summary:\nAll references verified against Crossref.')
+    // the reconciler and compact summary writer saw the citation summary
+    expect(reconcileCall(log).messages[0].content).toContain('Reference/citation check summary:\nAll references verified against Crossref.')
+    expect(summaryCall(log).messages[0].content).toContain('Reference/citation check summary:\nAll references verified against Crossref.')
 
     // result persisted under the run id and usage summed across all calls
     expect(log.puts).toEqual([{ name: 'reviews', key: '0123456789abcdef', value: result }])
-    // gatekeeper 10/5 + tech 100/50 + edit 100/50 + ref 30/10 + reconcile 40/40
-    expect(result.usage).toEqual({ input: 280, output: 155, cacheRead: 0, cacheCreation: 0 })
+    // gatekeeper 10/5 + tech 100/50 + edit 100/50 + ref 30/10 + reconcile 40/40 + summary 15/8
+    expect(result.usage).toEqual({ input: 295, output: 163, cacheRead: 0, cacheCreation: 0 })
     expect(result.domainHint).toBe('health economics')
     expect(log.progress.at(-1)).toEqual(['done', 'Review complete: 4 comments'])
     // resolved model id used for every AI call (callAnthropic uses .model, callModel uses .modelId)
@@ -608,7 +615,7 @@ describe('reviewDocx pipeline', () => {
       expect(call.system).toContain('Figures are provided as images')
       expect(call.system).toContain('anchor on its caption text')
     }
-    expect(reportCall(log).system).toContain('For table data, anchor on a single cell')
+    expect(reconcileCall(log).system).toContain('For table data, anchor on a single cell')
   })
 
   it('logs real reviewer completion and reconcile progress', async () => {
@@ -619,6 +626,8 @@ describe('reviewDocx pipeline', () => {
     expect(log.progress).toContainEqual(['log', 'Editorial reviewer · 2 issues'])
     expect(log.progress).toContainEqual(['log', 'Reference checker · 1 issue'])
     expect(log.progress).toContainEqual(['progress', 0.88, 'Reconciling 5/5'])
+    expect(log.progress).toContainEqual(['progress', 0.89, 'Writing review summary'])
+    expect(log.progress).toContainEqual(['progress', 0.9, 'Creating reviewed DOCX copy'])
   })
 
   it('fails early with the gatekeeper reason for non-reviewable documents', async () => {
@@ -720,7 +729,7 @@ describe('reviewDocx pipeline', () => {
     const result = await jobs.reviewDocx.run(ctx, { path: 'inputs/paper.docx' })
     expect(result.status).toBe('complete')
     expect(referenceSpy).not.toHaveBeenCalled()
-    expect(reportCall(log).messages[0].content).toContain('No bibliography section found.')
+    expect(reconcileCall(log).messages[0].content).toContain('No bibliography section found.')
   })
 
   it('truncates only above the selected model window, names the model, and points at Gemini', async () => {
@@ -776,7 +785,7 @@ describe('reviewDocx pipeline', () => {
     expect(technicalText).toContain('User notes to review agents:\nFocus on the statistical model.')
     expect(technicalText).not.toContain('OVERFLOW')
     expect(reviewerPaperText(reviewerCall(log, /editorial peer reviewer/i))).toContain('User notes to review agents:')
-    expect(reportCall(log).messages[0].content).toContain('User notes to review agents:')
+    expect(summaryCall(log).messages[0].content).toContain('User notes to review agents:')
   })
 
   it('sends all images under the high safety cap to reviewers', async () => {

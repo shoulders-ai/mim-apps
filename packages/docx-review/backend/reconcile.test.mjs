@@ -169,6 +169,12 @@ function makeReconcileCtx(handler) {
   return {
     ai: {
       callModel: vi.fn(async (opts) => {
+        if (!opts.tools?.length) {
+          return {
+            text: 'Summary.',
+            usage: { input: 3, output: 4, cacheRead: 0, cacheCreation: 0 },
+          }
+        }
         await handler(opts)
         return { usage: { input: 10, output: 10, cacheRead: 0, cacheCreation: 0 } }
       }),
@@ -180,6 +186,7 @@ function makeReconcileCtx(handler) {
 }
 
 const tool = (opts, name) => opts.tools.find(t => t.name === name)
+const batchDecide = async (opts, decisions) => tool(opts, 'decide_comments').execute({ decisions })
 const baseOpts = (rawComments, extra = {}) => ({
   paperMarkdown: PAPER, anchorText: PAPER, html: HTML, rawComments,
   citationSummary: null, reviewModel: 'claude-sonnet-4-6', reviewNotes: '',
@@ -193,9 +200,9 @@ describe('reconcileReview (agent loop)', () => {
       { reviewer: 'Editorial Reviewer', severity: 'minor', text_snippet: 'no power calculation', content: 'also overstated' },
     ]
     const ctx = makeReconcileCtx(async (opts) => {
-      const decide = tool(opts, 'decide_comment')
-      await decide.execute({ action: 'merge', source_ids: ['t0', 'e0'], text_snippet: 'no power calculation', content: 'Technical: underpowered. Editorial: overstated.', severity: 'major' })
-      await tool(opts, 'submit_report').execute({ report: 'Summary.' })
+      await batchDecide(opts, [
+        { action: 'merge', source_ids: ['t0', 'e0'], text_snippet: 'no power calculation', content: 'Technical: underpowered. Editorial: overstated.', severity: 'major' },
+      ])
     })
     const res = await reconcileReview(ctx, baseOpts(raw))
     expect(res.comments).toHaveLength(1)
@@ -211,31 +218,33 @@ describe('reconcileReview (agent loop)', () => {
       { reviewer: 'Editorial Reviewer', severity: 'minor', text_snippet: 'p = 0.049', content: 'drop me' },
     ]
     const ctx = makeReconcileCtx(async (opts) => {
-      await tool(opts, 'decide_comment').execute({ action: 'keep', source_ids: ['t0'], text_snippet: 'no power calculation', content: 'keep me', severity: 'major' })
-      await tool(opts, 'decide_comment').execute({ action: 'drop', source_ids: ['e0'], reason: 'not actionable' })
-      await tool(opts, 'submit_report').execute({ report: 'r' })
+      await batchDecide(opts, [
+        { action: 'keep', source_ids: ['t0'], text_snippet: 'no power calculation', content: 'keep me', severity: 'major' },
+        { action: 'drop', source_ids: ['e0'], reason: 'not actionable' },
+      ])
     })
     const res = await reconcileReview(ctx, baseOpts(raw))
     expect(res.comments).toHaveLength(1)
     expect(res.dropped).toEqual([{ rawId: 'e0', snippet: 'p = 0.049', reviewer: 'Editorial Reviewer', reason: 'not actionable' }])
   })
 
-  it('C26 submit_report before full coverage is rejected', async () => {
+  it('C26 rejects empty batches before full coverage', async () => {
     const raw = [
       { reviewer: 'Technical Reviewer', severity: 'major', text_snippet: 'no power calculation', content: 'a' },
       { reviewer: 'Editorial Reviewer', severity: 'minor', text_snippet: 'p = 0.049', content: 'b' },
     ]
-    let earlyReport
+    let emptyBatch
     const ctx = makeReconcileCtx(async (opts) => {
-      await tool(opts, 'decide_comment').execute({ action: 'keep', source_ids: ['t0'], text_snippet: 'no power calculation', content: 'a', severity: 'major' })
-      earlyReport = await tool(opts, 'submit_report').execute({ report: 'too soon' })
-      await tool(opts, 'decide_comment').execute({ action: 'keep', source_ids: ['e0'], text_snippet: 'p = 0.049', content: 'b', severity: 'minor' })
-      await tool(opts, 'submit_report').execute({ report: 'now ok' })
+      emptyBatch = await tool(opts, 'decide_comments').execute({ decisions: [] })
+      await batchDecide(opts, [
+        { action: 'keep', source_ids: ['t0'], text_snippet: 'no power calculation', content: 'a', severity: 'major' },
+        { action: 'keep', source_ids: ['e0'], text_snippet: 'p = 0.049', content: 'b', severity: 'minor' },
+      ])
     })
     const res = await reconcileReview(ctx, baseOpts(raw))
-    expect(earlyReport.success).toBe(false)
-    expect(earlyReport.remaining).toContain('e0')
-    expect(res.report).toBe('now ok')
+    expect(emptyBatch.success).toBe(false)
+    expect(emptyBatch.error).toMatch(/decisions/)
+    expect(res.report).toBe('Summary.')
   })
 
   it('C27 unaccounted-at-finish are auto-kept (recall guarantee)', async () => {
@@ -245,7 +254,9 @@ describe('reconcileReview (agent loop)', () => {
     ]
     const ctx = makeReconcileCtx(async (opts) => {
       // only decide t0, then stop (e0 left unaccounted)
-      await tool(opts, 'decide_comment').execute({ action: 'keep', source_ids: ['t0'], text_snippet: 'no power calculation', content: 'a', severity: 'major' })
+      await batchDecide(opts, [
+        { action: 'keep', source_ids: ['t0'], text_snippet: 'no power calculation', content: 'a', severity: 'major' },
+      ])
     })
     const res = await reconcileReview(ctx, baseOpts(raw))
     expect(res.comments).toHaveLength(2)
@@ -257,12 +268,16 @@ describe('reconcileReview (agent loop)', () => {
     const raw = [{ reviewer: 'Technical Reviewer', severity: 'major', text_snippet: 'no power calculation', content: 'a' }]
     let rej
     const ctx = makeReconcileCtx(async (opts) => {
-      rej = await tool(opts, 'decide_comment').execute({ action: 'keep', source_ids: ['t0'], text_snippet: 'TEXT NOT IN PAPER', content: 'a', severity: 'major' })
-      await tool(opts, 'decide_comment').execute({ action: 'keep', source_ids: ['t0'], text_snippet: 'no power calculation', content: 'a', severity: 'major' })
-      await tool(opts, 'submit_report').execute({ report: 'r' })
+      rej = await batchDecide(opts, [
+        { action: 'keep', source_ids: ['t0'], text_snippet: 'TEXT NOT IN PAPER', content: 'a', severity: 'major' },
+      ])
+      await batchDecide(opts, [
+        { action: 'keep', source_ids: ['t0'], text_snippet: 'no power calculation', content: 'a', severity: 'major' },
+      ])
     })
     const res = await reconcileReview(ctx, baseOpts(raw))
     expect(rej.success).toBe(false)
+    expect(rej.failed[0].error).toBe('text_snippet is not a verbatim substring of the paper')
     expect(res.comments).toHaveLength(1)
     expect(res.techNotes.rejectedAnchors.length).toBeGreaterThan(0)
   })
@@ -271,21 +286,25 @@ describe('reconcileReview (agent loop)', () => {
     const raw = [{ reviewer: 'Technical Reviewer', severity: 'minor', text_snippet: 'the value', content: 'which one?' }]
     let ambiguous
     const ctx = makeReconcileCtx(async (opts) => {
-      ambiguous = await tool(opts, 'decide_comment').execute({ action: 'keep', source_ids: ['t0'], text_snippet: 'the value', content: 'which one?', severity: 'minor' })
-      await tool(opts, 'decide_comment').execute({ action: 'keep', source_ids: ['t0'], text_snippet: 'the value', content: 'the third', severity: 'minor', disambiguator_before: 'two and ' })
-      await tool(opts, 'submit_report').execute({ report: 'r' })
+      ambiguous = await batchDecide(opts, [
+        { action: 'keep', source_ids: ['t0'], text_snippet: 'the value', content: 'which one?', severity: 'minor' },
+      ])
+      await batchDecide(opts, [
+        { action: 'keep', source_ids: ['t0'], text_snippet: 'the value', content: 'the third', severity: 'minor', disambiguator_before: 'two and ' },
+      ])
     })
     const res = await reconcileReview(ctx, baseOpts(raw))
     expect(ambiguous.success).toBe(false)
-    expect(ambiguous.error).toMatch(/occurs 3 times/)
+    expect(ambiguous.failed[0].error).toMatch(/occurs 3 times/)
     expect(res.comments[0].occurrenceIndex).toBe(2)
   })
 
   it('C31 severity is clamped to the enum', async () => {
     const raw = [{ reviewer: 'Technical Reviewer', severity: 'major', text_snippet: 'no power calculation', content: 'a' }]
     const ctx = makeReconcileCtx(async (opts) => {
-      await tool(opts, 'decide_comment').execute({ action: 'keep', source_ids: ['t0'], text_snippet: 'no power calculation', content: 'a', severity: 'critical' })
-      await tool(opts, 'submit_report').execute({ report: 'r' })
+      await batchDecide(opts, [
+        { action: 'keep', source_ids: ['t0'], text_snippet: 'no power calculation', content: 'a', severity: 'critical' },
+      ])
     })
     const res = await reconcileReview(ctx, baseOpts(raw))
     expect(res.comments[0].severity).toBe('suggestion')
@@ -294,8 +313,9 @@ describe('reconcileReview (agent loop)', () => {
   it('C23 DOCX/HTML agreement: occurrence 2 with disambiguator lands on the 3rd mark', async () => {
     const raw = [{ reviewer: 'Technical Reviewer', severity: 'minor', text_snippet: 'the value', content: 'third occurrence' }]
     const ctx = makeReconcileCtx(async (opts) => {
-      await tool(opts, 'decide_comment').execute({ action: 'keep', source_ids: ['t0'], text_snippet: 'the value', content: 'third occurrence', severity: 'minor', disambiguator_before: 'two and ' })
-      await tool(opts, 'submit_report').execute({ report: 'r' })
+      await batchDecide(opts, [
+        { action: 'keep', source_ids: ['t0'], text_snippet: 'the value', content: 'third occurrence', severity: 'minor', disambiguator_before: 'two and ' },
+      ])
     })
     const res = await reconcileReview(ctx, baseOpts(raw))
     // DOCX side: the op's occurrenceIndex (== comment.occurrenceIndex) is 2
@@ -324,8 +344,9 @@ describe('reconcileReview (agent loop)', () => {
     const raw = [{ reviewer: 'Technical Reviewer', severity: 'major', text_snippet: 'no power calculation', content: 'a' }]
     const ctx = makeReconcileCtx(async (opts) => {
       expect(opts.modelId).toBe('gemini-3.1-pro-preview')
-      await tool(opts, 'decide_comment').execute({ action: 'keep', source_ids: ['t0'], text_snippet: 'no power calculation', content: 'a', severity: 'major' })
-      await tool(opts, 'submit_report').execute({ report: 'r' })
+      await batchDecide(opts, [
+        { action: 'keep', source_ids: ['t0'], text_snippet: 'no power calculation', content: 'a', severity: 'major' },
+      ])
     })
     const res = await reconcileReview(ctx, baseOpts(raw, { reviewModel: 'gemini-3.1-pro-preview' }))
     expect(res.comments).toHaveLength(1)
@@ -338,9 +359,10 @@ describe('reconcileReview (agent loop)', () => {
       { reviewer: 'Reference Checker', severity: 'minor', text_snippet: 'the value one', content: 'c' },
     ]
     const ctx = makeReconcileCtx(async (opts) => {
-      await tool(opts, 'decide_comment').execute({ action: 'merge', source_ids: ['t0', 'e0'], text_snippet: 'no power calculation', content: 'merged', severity: 'major' })
-      await tool(opts, 'decide_comment').execute({ action: 'drop', source_ids: ['r0'], reason: 'redundant' })
-      await tool(opts, 'submit_report').execute({ report: 'r' })
+      await batchDecide(opts, [
+        { action: 'merge', source_ids: ['t0', 'e0'], text_snippet: 'no power calculation', content: 'merged', severity: 'major' },
+        { action: 'drop', source_ids: ['r0'], reason: 'redundant' },
+      ])
     })
     const res = await reconcileReview(ctx, baseOpts(raw))
     const originIds = res.comments.flatMap(c => c.origin)
@@ -348,19 +370,45 @@ describe('reconcileReview (agent loop)', () => {
     expect(new Set(originIds).size + droppedCount).toBe(3)
   })
 
-  it('emits determinate progress after successful reconciliation decisions', async () => {
+  it('emits one determinate progress update per successful reconciliation batch', async () => {
     const raw = [
       { reviewer: 'Technical Reviewer', severity: 'major', text_snippet: 'no power calculation', content: 'a' },
       { reviewer: 'Editorial Reviewer', severity: 'minor', text_snippet: 'p = 0.049', content: 'b' },
     ]
     const ctx = makeReconcileCtx(async (opts) => {
-      await tool(opts, 'decide_comment').execute({ action: 'keep', source_ids: ['t0'], text_snippet: 'no power calculation', content: 'a', severity: 'major' })
-      await tool(opts, 'decide_comment').execute({ action: 'drop', source_ids: ['e0'], reason: 'not actionable' })
-      await tool(opts, 'submit_report').execute({ report: 'r' })
+      await batchDecide(opts, [
+        { action: 'keep', source_ids: ['t0'], text_snippet: 'no power calculation', content: 'a', severity: 'major' },
+        { action: 'drop', source_ids: ['e0'], reason: 'not actionable' },
+      ])
     })
     await reconcileReview(ctx, baseOpts(raw))
-    expect(ctx.progress.progress).toHaveBeenCalledWith(0.8, 'Reconciling 1/2')
     expect(ctx.progress.progress).toHaveBeenCalledWith(0.88, 'Reconciling 2/2')
+    expect(ctx.progress.progress).toHaveBeenCalledTimes(2)
+  })
+
+  it('uses the reconciler budget step cap instead of scaling steps with comment count', async () => {
+    const raw = Array.from({ length: 47 }, () => (
+      { reviewer: 'Technical Reviewer', severity: 'major', text_snippet: 'no power calculation', content: 'a' }
+    ))
+    const ctx = makeReconcileCtx(async (opts) => {
+      expect(opts.maxSteps).toBe(8)
+    })
+    await reconcileReview(ctx, baseOpts(raw, { budget: { paperCharBudget: Infinity, maxOutputTokens: 48000, maxSteps: 8 } }))
+  })
+
+  it('generates the summary from reconciled comments in a compact no-tool call', async () => {
+    const raw = [{ reviewer: 'Technical Reviewer', severity: 'major', text_snippet: 'no power calculation', content: 'a' }]
+    const ctx = makeReconcileCtx(async (opts) => {
+      await batchDecide(opts, [
+        { action: 'keep', source_ids: ['t0'], text_snippet: 'no power calculation', content: 'a', severity: 'major' },
+      ])
+    })
+    const res = await reconcileReview(ctx, baseOpts(raw))
+    const summaryCall = ctx.ai.callModel.mock.calls.map(call => call[0]).find(call => !call.tools?.length)
+    expect(summaryCall).toBeTruthy()
+    expect(summaryCall.messages[0].content).toContain('"number":1')
+    expect(summaryCall.messages[0].content).not.toContain(PAPER)
+    expect(res.report).toBe('Summary.')
   })
 
   it('budget overflow -> loud failure (decision #1)', async () => {

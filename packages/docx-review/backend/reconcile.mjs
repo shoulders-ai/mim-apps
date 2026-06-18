@@ -1,8 +1,7 @@
-// The reconciliation stage. Replaces both deduplicateComments (snippet-only) and
-// writeReport with ONE agent that has full visibility over every raw comment:
-// it merges/aggregates, resolves contradictions, normalizes severity, may drop
-// comments WITH a logged reason, and writes the final report — in a single tool
-// loop via the provider-agnostic ctx.ai.callModel.
+// The reconciliation stage. The model sees every raw comment at once and submits
+// batched reconciliation decisions. A separate compact summary call then writes
+// the report from the reconciled comments only, avoiding a long no-progress tail
+// after the last raw comment has already been accounted for.
 //
 // The anchor-safety spine: code (never the model) assigns occurrenceIndex using
 // the DOCX worker's EXACT counting algorithm (per-paragraph, overlapping, no
@@ -255,14 +254,23 @@ Your job:
 1. MERGE comments that address the same issue or the same span into ONE balloon. Synthesize them into a SINGLE concise note — do not concatenate them and do not label perspectives inline ("Technical: … Editorial: …"). If two reviewers add genuinely different points about the same span, state the combined point in one sentence; if they are the same point, say it once. A "Likely duplicates" hint is provided; treat it as advice, not instruction.
 2. RESOLVE contradictions. When reviewers disagree (e.g. one says the sample is adequate, another says it is underpowered), DECIDE and emit ONE balloon stating the better-supported position — never two contradictory balloons on the same span. Keep the adjudication to a clause, not a paragraph.
 3. NORMALIZE severity. Per merged balloon choose a single severity. Take the HIGHEST severity among the merged inputs unless it is clearly unwarranted.
-4. ACCOUNT FOR EVERY raw comment EXACTLY ONCE. Use decide_comment with action "keep", "merge", or "drop". You MAY drop a comment that is wrong, redundant after merging, out of scope, or not actionable — but a drop is an EXPLICIT decision with a reason; never drop a perspective silently inside a merge. After each call the tool tells you which ids remain.
+4. ACCOUNT FOR EVERY raw comment EXACTLY ONCE. Use decide_comments decisions with action "keep", "merge", or "drop". You MAY drop a comment that is wrong, redundant after merging, out of scope, or not actionable — but a drop is an EXPLICIT decision with a reason; never drop a perspective silently inside a merge. After each call the tool tells you which ids remain.
 5. ANCHORS. Each keep/merge text_snippet MUST be a verbatim substring of the manuscript. Prefer the SHORTEST UNIQUE span that locates the issue. For table data, anchor on a single cell's text, never a pipe row. If the only available phrasing recurs in the document, you MUST pass disambiguator_before: the verbatim text immediately preceding the occurrence you mean, so the balloon lands on the right sentence. If the tool rejects an anchor, fix it and call again.
 6. For action "keep", do not pass the raw comment through unchanged — rewrite it to the comment style below (raw comments are usually too long).
-7. When you have accounted for every id, call submit_report ONCE with a one-page summary (<=400 words) that orients the reader. The reader also sees every inline balloon — the summary must NOT restate them.
+7. BATCHING. Prefer ONE decide_comments call containing decisions for every remaining raw comment. If a batch response reports failures, repair only the failed/remaining ids in the next decide_comments call.
 
 ${COMMENT_STYLE}
 
-Call decide_comment repeatedly, then submit_report last. Do not write prose outside the tools.`
+Call decide_comments. Do not write prose outside the tool.`
+
+const SUMMARY_SYSTEM = `You write the concise peer-review summary that appears above inline DOCX comments.
+
+Use only the reconciled comment list and metadata provided. Do not invent findings not present in the comments. The reader also sees every inline balloon, so orient them without restating every note.
+
+Return Markdown only. Use:
+## Peer Review Summary
+
+Then 2-4 short paragraphs or a short bullet list. Keep it under 250 words.`
 
 export async function reconcileReview(ctx, opts) {
   const {
@@ -318,8 +326,6 @@ export async function reconcileReview(ctx, opts) {
   const final = []
   const dropped = []
   const accountedIds = new Set()
-  let report = ''
-
   function remaining() {
     return [...allRawIds].filter(id => !accountedIds.has(id))
   }
@@ -348,7 +354,8 @@ export async function reconcileReview(ctx, opts) {
     await ctx.progress.progress(value, `Reconciling ${accounted}/${total}`)
   }
 
-  async function recordDecision(input = {}) {
+  async function recordDecision(input = {}, options = {}) {
+    const emitProgress = options.emitProgress !== false
     const ids = Array.isArray(input.source_ids) ? input.source_ids : []
     if (!ids.length) return { success: false, error: 'source_ids required', remaining: remaining() }
     if (ids.some(id => !rawById.has(id) || accountedIds.has(id))) {
@@ -364,8 +371,8 @@ export async function reconcileReview(ctx, opts) {
         dropped.push({ rawId: id, snippet: c.text_snippet, reviewer: c.reviewer, reason: String(input.reason) })
       }
       ids.forEach(id => accountedIds.add(id))
-      await emitReconcileProgress()
-      return { success: true, remaining: remaining() }
+      if (emitProgress) await emitReconcileProgress()
+      return { success: true, consumed: ids.length, remaining: remaining() }
     }
 
     if (input.action !== 'keep' && input.action !== 'merge') {
@@ -387,16 +394,45 @@ export async function reconcileReview(ctx, opts) {
     if (occ.error) return { success: false, error: occ.error, remaining: remaining() }
     pushFinal(snippet, valid[0].content, valid[0].severity, occ.index, ids)
     ids.forEach(id => accountedIds.add(id))
-    await emitReconcileProgress()
-    return { success: true, occurrenceIndex: occ.index, remaining: remaining() }
+    if (emitProgress) await emitReconcileProgress()
+    return { success: true, consumed: ids.length, occurrenceIndex: occ.index, remaining: remaining() }
   }
 
-  function recordReport(text) {
-    if (accountedIds.size !== allRawIds.size) {
-      return { success: false, error: 'Not all comments accounted for', remaining: remaining() }
+  async function recordDecisionBatch(input = {}) {
+    const decisions = Array.isArray(input.decisions) ? input.decisions : []
+    if (!decisions.length) {
+      return { success: false, error: 'decisions must be a non-empty array', remaining: remaining() }
     }
-    report = String(text || '')
-    return { success: true }
+    const results = []
+    const failed = []
+    let accepted = 0
+    let consumed = 0
+    for (const [index, decision] of decisions.entries()) {
+      const result = await recordDecision(decision, { emitProgress: false })
+      if (result.success) {
+        accepted += 1
+        consumed += result.consumed || 0
+        results.push({ index, success: true, consumed: result.consumed || 0 })
+      } else {
+        const failure = {
+          index,
+          source_ids: Array.isArray(decision?.source_ids) ? decision.source_ids : [],
+          error: result.error || 'decision failed',
+          reason: result.reason,
+        }
+        failed.push(failure)
+        results.push({ index, success: false, error: failure.error, reason: failure.reason })
+      }
+    }
+    if (accepted > 0) await emitReconcileProgress()
+    return {
+      success: failed.length === 0,
+      accepted,
+      consumed,
+      failed,
+      results,
+      remaining: remaining(),
+    }
   }
 
   // Prompt assembly (no truncation up to window).
@@ -413,53 +449,55 @@ export async function reconcileReview(ctx, opts) {
   if (hintGroups.length) {
     userMessage += `Likely duplicates (same/overlapping anchor): ${hintGroups.map(g => `[${g.join(', ')}]`).join('; ')}\n\n`
   }
-  userMessage += `Raw comments — account for EVERY id exactly once via decide_comment:\n` +
+  userMessage += `Raw comments — account for EVERY id exactly once via decide_comments decisions:\n` +
     `${JSON.stringify(raw.map(({ rawId, reviewer, severity, text_snippet, content }) => ({ rawId, reviewer, severity, text_snippet, content })), null, 2)}\n`
 
-  const decideTool = {
-    name: 'decide_comment',
+  const decisionProperties = {
+    action: { type: 'string', enum: ['keep', 'merge', 'drop'] },
+    source_ids: { type: 'array', items: { type: 'string' }, minItems: 1, description: 'rawIds consumed by this decision' },
+    text_snippet: { type: 'string', description: 'Exact verbatim quote anchoring the balloon. Prefer the shortest UNIQUE span.' },
+    content: { type: 'string', description: 'Final balloon text — one concise margin note (~30 words, max 45). No reviewer name, severity word, number, or "Fix:" label; standards as short parenthetical tags only.' },
+    severity: { type: 'string', enum: ['major', 'minor', 'suggestion'] },
+    disambiguator_before: { type: 'string', description: 'Verbatim text immediately preceding the intended occurrence; required only when text_snippet recurs.' },
+    reason: { type: 'string', description: 'Why these comments are dropped (action=drop).' },
+  }
+  const decideBatchTool = {
+    name: 'decide_comments',
     description:
-      'Record ONE reconciliation decision. action="keep" emits a single final comment from one raw comment. ' +
-      'action="merge" emits ONE final comment fusing several raw comments — preserve each distinct perspective and ' +
-      'state any contradiction explicitly. action="drop" discards one or more raw comments with a reason. Every raw ' +
-      'comment id must be accounted for exactly once across all calls. For keep/merge, text_snippet MUST be a verbatim ' +
-      'substring of the paper; if that snippet occurs more than once you MUST also pass disambiguator_before (the ' +
-      'verbatim text immediately preceding the intended occurrence) so the comment anchors to the correct location.',
+      'Record a BATCH of reconciliation decisions. Prefer one call containing decisions for all remaining raw ids. ' +
+      'Each decision has action="keep", "merge", or "drop". keep emits a final comment from one raw comment; merge ' +
+      'emits one final comment fusing several raw comments; drop discards one or more raw comments with a reason. ' +
+      'Every raw id must be accounted for exactly once across all accepted decisions. For keep/merge, text_snippet ' +
+      'must be a verbatim substring of the paper; if it recurs, pass disambiguator_before.',
     input_schema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['keep', 'merge', 'drop'] },
-        source_ids: { type: 'array', items: { type: 'string' }, minItems: 1, description: 'rawIds consumed by this decision' },
-        text_snippet: { type: 'string', description: 'Exact verbatim quote anchoring the balloon. Prefer the shortest UNIQUE span.' },
-        content: { type: 'string', description: 'Final balloon text — one concise margin note (~30 words, max 45). No reviewer name, severity word, number, or "Fix:" label; standards as short parenthetical tags only.' },
-        severity: { type: 'string', enum: ['major', 'minor', 'suggestion'] },
-        disambiguator_before: { type: 'string', description: 'Verbatim text immediately preceding the intended occurrence; required only when text_snippet recurs.' },
-        reason: { type: 'string', description: 'Why these comments are dropped (action=drop).' },
+        decisions: {
+          type: 'array',
+          minItems: 1,
+          items: {
+            type: 'object',
+            properties: decisionProperties,
+            required: ['action', 'source_ids'],
+          },
+        },
       },
-      required: ['action', 'source_ids'],
+      required: ['decisions'],
     },
-    execute: async (input) => recordDecision(input),
-  }
-  const reportTool = {
-    name: 'submit_report',
-    description:
-      'Submit the one-page peer-review summary. Call this LAST, only after EVERY raw comment has been accounted for ' +
-      'via decide_comment. The summary orients the reader; it must NOT restate the inline comments. <=400 words.',
-    input_schema: {
-      type: 'object',
-      properties: { report: { type: 'string' } },
-      required: ['report'],
-    },
-    execute: async ({ report: text } = {}) => recordReport(text),
+    execute: async (input) => recordDecisionBatch(input),
   }
 
-  const maxSteps = Math.min(40, rawInput.length * 2 + 6)
+  const maxSteps = Math.max(3, Math.min(12, Number(budget?.maxSteps) || 8))
+  const maxTokens = Math.min(
+    Number(budget?.maxOutputTokens) || 24_000,
+    Math.max(6_000, rawInput.length * 300),
+  )
   const agentResult = await runAgent(() => ctx.ai.callModel({
     modelId: reviewModel,
     system: RECONCILER_SYSTEM,
     messages: [{ role: 'user', content: userMessage }],
-    tools: [decideTool, reportTool],
-    maxTokens: budget?.maxOutputTokens ?? 48_000,
+    tools: [decideBatchTool],
+    maxTokens,
     maxSteps,
   }))
 
@@ -470,8 +508,11 @@ export async function reconcileReview(ctx, opts) {
     return finalizeBundle(fb.final, [], fb.report, { fallbackReport: true })
   }
   addUsage(usage, agentResult.usage)
+  techNotes.reconcilerSteps = agentResult.steps ?? null
+  techNotes.reconcilerFinishReason = agentResult.finishReason ?? null
 
   // Finish discipline: auto-keep any rawId left unaccounted (recall guarantee).
+  let autoKeptAny = false
   for (const id of remaining()) {
     const c = rawById.get(id)
     const { valid } = validateAnchors([{ text_snippet: c.text_snippet, content: c.content, severity: c.severity }], paperMarkdown)
@@ -480,17 +521,20 @@ export async function reconcileReview(ctx, opts) {
       dropped.push({ rawId: id, snippet: c.text_snippet, reviewer: c.reviewer, reason: 'anchor could not be re-validated' })
       techNotes.rejectedAnchors.push({ snippet: String(c.text_snippet || '').slice(0, 120), reason: 'auto-keep re-validation failed' })
       accountedIds.add(id)
+      autoKeptAny = true
       continue
     }
     const occ = resolveOccurrence(paperMarkdown, valid[0].text_snippet, undefined)
     pushFinal(valid[0].text_snippet, valid[0].content, valid[0].severity, occ.error ? 0 : occ.index, [id])
     techNotes.autoKept.push(id)
     accountedIds.add(id)
+    autoKeptAny = true
   }
+  if (autoKeptAny) await emitReconcileProgress()
 
-  return finalizeBundle(final, dropped, report, { fallbackReport: false })
+  return finalizeBundle(final, dropped, '', { fallbackReport: false })
 
-  function finalizeBundle(finalList, droppedList, reportText, { fallbackReport }) {
+  async function finalizeBundle(finalList, droppedList, reportText, { fallbackReport }) {
     // Recall invariant (enforced on EVERY path, incl. degraded): every rawId must
     // be in some final entry's origin OR explicitly dropped. Anything missing is
     // auto-kept under its original snippet — never silently lost.
@@ -514,10 +558,25 @@ export async function reconcileReview(ctx, opts) {
     assignFallbackOccurrenceForCollisions(finalList, paperMarkdown, techNotes.occurrenceConflicts)
     const numbered = buildNumberedComments(finalList)
     let finalReport = reportText
+    if (!fallbackReport) {
+      const summary = await generateReviewSummary(ctx, {
+        reviewModel,
+        reviewNotes,
+        docProfile,
+        partial,
+        citationSummary,
+        comments: numbered,
+        dropped: droppedList,
+      })
+      addUsage(usage, summary.usage)
+      finalReport = summary.report
+      if (summary.fallback) techNotes.reportFallback = true
+    }
     if (!finalReport || !finalReport.trim()) {
       finalReport = synthesizeFallbackReport(finalList)
       techNotes.reportFallback = true
-    } else if (fallbackReport) {
+    }
+    if (fallbackReport) {
       techNotes.reportFallback = true
     }
     techNotes.keptCount = numbered.length
@@ -526,4 +585,62 @@ export async function reconcileReview(ctx, opts) {
     const anchoredHtml = anchorCommentsInHtml(html, numbered)
     return { comments: numbered, dropped: droppedList, report: finalReport, anchoredHtml, usage, techNotes }
   }
+}
+
+async function generateReviewSummary(ctx, {
+  reviewModel,
+  reviewNotes = '',
+  docProfile = null,
+  partial = false,
+  citationSummary = '',
+  comments = [],
+  dropped = [],
+}) {
+  if (typeof ctx?.progress?.progress === 'function') {
+    await ctx.progress.progress(0.89, 'Writing review summary')
+  }
+  const counts = { major: 0, minor: 0, suggestion: 0 }
+  for (const comment of comments) counts[normalizeSeverity(comment.severity)] += 1
+  const payload = {
+    partialReview: !!partial,
+    counts,
+    commentCount: comments.length,
+    droppedCount: dropped.length,
+    citationSummary: citationSummary || null,
+    comments: comments.map(comment => ({
+      number: comment.number,
+      severity: normalizeSeverity(comment.severity),
+      sourceReviewers: comment.sourceReviewers || [],
+      text_snippet: comment.text_snippet,
+      content: comment.content,
+    })),
+    dropped: dropped.slice(0, 30).map(item => ({
+      reviewer: item.reviewer || '',
+      snippet: item.snippet || '',
+      reason: item.reason || '',
+    })),
+  }
+  const content =
+    `${reviewNotesBlock(reviewNotes)}${docProfileBlock(docProfile)}` +
+    `${citationSummary ? `Reference/citation check summary:\n${citationSummary}\n\n` : ''}` +
+    `Write the peer-review summary from this reconciled review payload. ` +
+    `Do not include comment numbers unless they help orient the reader.\n\n` +
+    `${JSON.stringify(payload)}`
+
+  try {
+    const result = await ctx.ai.callModel({
+      modelId: reviewModel,
+      system: SUMMARY_SYSTEM,
+      messages: [{ role: 'user', content }],
+      maxTokens: 1_200,
+      maxSteps: 1,
+      timeoutMs: 120_000,
+    })
+    const report = String(result?.text || '').trim()
+    if (report) return { report, usage: result?.usage, fallback: false }
+  } catch {
+    // The inline comments are the durable output. A summary failure should not
+    // fail the whole DOCX review.
+  }
+  return { report: synthesizeFallbackReport(comments), usage: null, fallback: true }
 }
