@@ -1,6 +1,6 @@
 # Mim Apps
 
-Apps for [Mim](https://github.com/shoulders-ai/mim) — the operating system for AI-native research organisations.
+Apps for [Mim](https://github.com/shoulders-ai/mim-os) — the operating system for AI-native research organisations.
 
 Browse and install from **Settings > Apps** inside Mim.
 
@@ -42,4 +42,4 @@ Packages hosted in other repos can be added to `external.json`. The registry bui
 npm install && npx vitest run
 ```
 
-Tests live next to source files (`packages/**/*.test.{mjs,ts}`). For runtime compatibility testing against the Mim core, see the [core repo](https://github.com/shoulders-ai/mim).
+Tests live next to source files (`packages/**/*.test.{mjs,ts}`). For runtime compatibility testing against the Mim core, see the [core repo](https://github.com/shoulders-ai/mim-os).
