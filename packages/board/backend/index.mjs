@@ -1,5 +1,6 @@
 export const STATUSES = ['backlog', 'plan', 'in-progress', 'review', 'done']
 export const PRIORITIES = ['low', 'normal', 'high', 'urgent']
+export const LABEL_COLORS = ['gray', 'green', 'yellow', 'blue', 'purple', 'red', 'orange']
 
 const ISSUE_DIR = 'issues'
 const ISSUE_ID_RE = /^issue-\d+-[a-z0-9]{4}$/
@@ -20,6 +21,16 @@ const issueFieldsSchema = {
   priority: { type: 'string', enum: PRIORITIES },
   dueDate: { type: 'string' },
   tags: { type: 'array', items: { type: 'string' } },
+  project: { type: 'string' },
+  assignee: { type: 'string' },
+  labels: {
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: { name: { type: 'string' }, color: { type: 'string' } },
+      required: ['name'],
+    },
+  },
   waitingFor: { type: 'string' },
   snoozeUntil: { type: 'string' },
   deliverables: deliverableSchema,
@@ -151,6 +162,19 @@ function coerceTags(value) {
   return []
 }
 
+function coerceLabels(value, tags) {
+  if (Array.isArray(value) && value.length > 0 && value.every(v => v && typeof v === 'object' && typeof v.name === 'string')) {
+    return value.map(v => ({
+      name: v.name,
+      color: LABEL_COLORS.includes(v.color) ? v.color : 'gray',
+    }))
+  }
+  if (Array.isArray(tags) && tags.length > 0) {
+    return tags.map(t => ({ name: String(t), color: 'gray' }))
+  }
+  return []
+}
+
 function coerceDeliverables(value) {
   if (!Array.isArray(value)) return []
   return value
@@ -171,12 +195,16 @@ export function parseIssue(id, raw) {
     meta = {}
   }
 
+  const labels = coerceLabels(meta.labels, coerceTags(meta.tags))
   const issue = {
     id,
     title: typeof meta.title === 'string' ? meta.title : '',
     status: coerceStatus(meta.status),
     priority: coercePriority(meta.priority),
-    tags: coerceTags(meta.tags),
+    tags: labels.map(l => l.name),
+    project: typeof meta.project === 'string' ? meta.project : '',
+    assignee: typeof meta.assignee === 'string' ? meta.assignee : '',
+    labels,
     deliverables: coerceDeliverables(meta.deliverables),
     created: typeof meta.created === 'string' ? meta.created : '',
     updated: typeof meta.updated === 'string' ? meta.updated : '',
@@ -195,7 +223,17 @@ export function serializeIssue(issue) {
     `priority: ${yamlScalar(issue.priority)}`,
   ]
   if (issue.dueDate !== undefined) lines.push(`dueDate: ${yamlScalar(issue.dueDate)}`)
-  if (Array.isArray(issue.tags) && issue.tags.length > 0) {
+  if (issue.project) lines.push(`project: ${yamlScalar(issue.project)}`)
+  if (issue.assignee) lines.push(`assignee: ${yamlScalar(issue.assignee)}`)
+  if (Array.isArray(issue.labels) && issue.labels.length > 0) {
+    lines.push('labels:')
+    for (const label of issue.labels) {
+      lines.push(`  - name: ${yamlScalar(label.name)}`)
+      lines.push(`    color: ${yamlScalar(label.color ?? 'gray')}`)
+    }
+    lines.push('tags:')
+    for (const label of issue.labels) lines.push(`  - ${yamlScalar(label.name)}`)
+  } else if (Array.isArray(issue.tags) && issue.tags.length > 0) {
     lines.push('tags:')
     for (const tag of issue.tags) lines.push(`  - ${yamlScalar(tag)}`)
   }
@@ -218,6 +256,18 @@ export function validateIssue(partial) {
   if (typeof partial.title !== 'string' || partial.title.trim() === '') errors.push('title is required')
   if (partial.status !== undefined && !STATUSES.includes(partial.status)) errors.push('invalid status')
   if (partial.priority !== undefined && !PRIORITIES.includes(partial.priority)) errors.push('invalid priority')
+  if (partial.labels !== undefined) {
+    for (const l of partial.labels ?? []) {
+      if (!l || typeof l.name !== 'string' || l.name.trim() === '') {
+        errors.push('each label needs a non-empty name')
+        break
+      }
+      if (l.color !== undefined && !LABEL_COLORS.includes(l.color)) {
+        errors.push(`invalid label color: ${l.color}`)
+        break
+      }
+    }
+  }
   if (partial.deliverables !== undefined) {
     for (const d of partial.deliverables ?? []) {
       if (!d || typeof d.path !== 'string' || d.path === '') {
@@ -273,12 +323,18 @@ export async function createIssue(ctx, input = {}) {
   if (!validation.ok) throw new Error(validation.errors.join('; '))
 
   const timestamp = new Date().toISOString()
+  const labels = Array.isArray(input.labels)
+    ? coerceLabels(input.labels, [])
+    : coerceLabels(null, Array.isArray(input.tags) ? input.tags : [])
   const issue = {
     id: '',
     title: input.title,
     status: input.status ?? 'backlog',
     priority: input.priority ?? 'normal',
-    tags: Array.isArray(input.tags) ? input.tags : [],
+    tags: labels.map(l => l.name),
+    project: typeof input.project === 'string' ? input.project : '',
+    assignee: typeof input.assignee === 'string' ? input.assignee : '',
+    labels,
     deliverables: Array.isArray(input.deliverables) ? input.deliverables : [],
     created: timestamp,
     updated: timestamp,
@@ -310,6 +366,13 @@ export async function updateIssue(ctx, input = {}) {
   const existing = await readIssueFile(ctx, id)
   const patch = { ...input }
   delete patch.id
+  if (Array.isArray(patch.labels)) {
+    patch.labels = coerceLabels(patch.labels, [])
+    patch.tags = patch.labels.map(l => l.name)
+  } else if (Array.isArray(patch.tags) && !Array.isArray(patch.labels)) {
+    patch.labels = coerceLabels(null, patch.tags)
+    patch.tags = patch.labels.map(l => l.name)
+  }
   const merged = { ...existing, ...patch, id: existing.id, created: existing.created }
   const validation = validateIssue(merged)
   if (!validation.ok) throw new Error(validation.errors.join('; '))
@@ -356,7 +419,12 @@ export async function issueAgentContext(ctx) {
   const today = dayKey(now)
   const horizon = dayKey(now + DUE_SOON_DAYS * 86400000)
   const lines = [`Counts: ${counts.join(', ')}`]
-  appendIssueList(lines, 'In progress', sorted.filter(i => i.status === 'in-progress'), i => titleOf(i.title))
+  appendIssueList(lines, 'In progress', sorted.filter(i => i.status === 'in-progress'), i => {
+    const parts = [titleOf(i.title)]
+    if (i.project) parts.push(`[${i.project}]`)
+    if (i.assignee) parts.push(`@${i.assignee}`)
+    return parts.join(' ')
+  })
   appendIssueList(lines, 'Waiting on', sorted.filter(i => i.waitingFor), i => `${titleOf(i.title)} (waiting for ${i.waitingFor})`)
   appendIssueList(lines, 'Snoozed', sorted.filter(i => i.snoozeUntil), i => `${titleOf(i.title)} (until ${i.snoozeUntil})`)
   appendIssueList(lines, 'Overdue', sorted.filter(i => i.dueDate && i.dueDate < today), i => `${titleOf(i.title)} (due ${i.dueDate})`)

@@ -37,4 +37,27 @@ describe('Board UI chrome contracts', () => {
     expect(declaration(boardRule, 'scrollbar-width')).toEqual({ value: 'none', important: false })
     expect(declaration(scrollbarRule, 'height')).toEqual({ value: '0', important: false })
   })
+
+  it('centers the detail layout', () => {
+    const layout = ruleFor('.detail-layout')
+    expect(declaration(layout, 'justify-content')).toEqual({ value: 'center', important: false })
+  })
+
+  it('constrains the detail content width', () => {
+    const center = ruleFor('.detail-center')
+    expect(declaration(center, 'max-width')).toEqual({ value: '920px', important: false })
+  })
+
+  it('keeps field menus above other content', () => {
+    const menu = ruleFor('.field-menu')
+    const zIndex = declaration(menu, 'z-index')
+    expect(Number(zIndex.value)).toBeGreaterThanOrEqual(90)
+  })
+
+  it('renders status tokens as fixed-size circles', () => {
+    const token = ruleFor('.status-token')
+    expect(declaration(token, 'width')).toEqual({ value: '13px', important: false })
+    expect(declaration(token, 'height')).toEqual({ value: '13px', important: false })
+    expect(declaration(token, 'border-radius')).toEqual({ value: '50%', important: false })
+  })
 })

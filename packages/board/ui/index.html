@@ -5,41 +5,201 @@
   <link rel="stylesheet" href="/sdk/tokens.css">
   <title>Board</title>
   <style>
-    /* ── Layout ── */
-    html, body { height: 100%; overflow: hidden; }
-    body { display: flex; flex-direction: column; }
+    /* ── Reset & Layout ── */
+    html, body { height: 100%; overflow: hidden; margin: 0; }
+    body {
+      display: flex;
+      flex-direction: column;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.2;
+      color: var(--color-ink);
+      background: var(--color-surface);
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+    * { box-sizing: border-box; }
+    button {
+      appearance: none;
+      border: 0;
+      background: transparent;
+      padding: 0;
+      margin: 0;
+      color: inherit;
+      font: inherit;
+    }
+    input, textarea, select, [contenteditable] { user-select: text; }
 
-    .toolbar {
+    .svg-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+    .icon {
+      width: 13px; height: 13px;
+      display: inline-block;
+      vertical-align: -2px;
+      color: currentColor;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      flex: 0 0 auto;
+    }
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      position: relative;
+    }
+
+    /* ── Header ── */
+    .header-bar {
       display: flex;
       align-items: center;
-      gap: var(--space-sm);
-      padding: 6px var(--space-md);
+      justify-content: space-between;
+      height: 40px;
+      padding: 0 14px;
       border-bottom: 1px solid var(--color-rule-light);
       flex-shrink: 0;
     }
-    .toolbar-title {
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .header-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--color-ink);
+    }
+    .header-btn {
+      width: 26px; height: 26px;
+      display: grid;
+      place-items: center;
+      border-radius: 5px;
+      color: var(--color-ink-3);
+    }
+    .header-btn:hover { background: var(--color-chrome-mid); color: var(--color-ink); }
+    .header-back {
+      width: 26px; height: 26px;
+      display: grid;
+      place-items: center;
+      border-radius: 5px;
+      color: var(--color-ink-3);
+    }
+    .header-back:hover { background: var(--color-chrome-mid); color: var(--color-ink); }
+    .header-back-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px 3px 4px;
+      border-radius: 5px;
+      color: var(--color-ink-3);
       font-size: 12px;
       font-weight: 600;
+    }
+    .header-back-label:hover { background: var(--color-chrome-mid); color: var(--color-ink); }
+    .header-crumb-sep { color: var(--color-ink-4); }
+    .header-crumb-current {
+      color: var(--color-ink);
+      font-weight: 700;
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ── Tab Bar ── */
+    .tab-bar {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+      border-bottom: 1px solid var(--color-rule-light);
+      flex-shrink: 0;
+    }
+    .tabs-left { display: flex; gap: 5px; align-items: center; }
+    .tabs-right { display: flex; gap: 5px; align-items: center; }
+    .tab-pill {
+      height: 26px;
+      padding: 0 12px;
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--color-rule-light);
+      border-radius: 13px;
+      color: var(--color-ink-3);
+      font-weight: 650;
+      font-size: 12px;
+    }
+    .tab-pill:hover { background: var(--color-chrome-mid); color: var(--color-ink-2); }
+    .tab-pill.active {
+      color: var(--color-ink-2);
+      background: var(--color-chrome-mid);
+      border-color: var(--color-rule);
+    }
+    .tab-btn {
+      width: 26px; height: 26px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--color-rule-light);
+      border-radius: 50%;
+      color: var(--color-ink-3);
+    }
+    .tab-btn:hover { background: var(--color-chrome-mid); color: var(--color-ink-2); }
+    .tab-btn.active { background: var(--color-chrome-mid); color: var(--color-ink); }
+    .tab-sep {
+      width: 1px;
+      height: 14px;
+      background: var(--color-rule-light);
+      margin: 0 2px;
+    }
+
+    /* ── View Toggle (inline in tab bar) ── */
+    .view-toggle {
+      display: inline-flex;
+      gap: 2px;
+      align-items: center;
+      border: 1px solid var(--color-rule-light);
+      border-radius: 13px;
+      padding: 2px;
+    }
+    .vt-btn {
+      height: 20px;
+      padding: 0 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border-radius: 10px;
+      color: var(--color-ink-3);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .vt-btn:hover { color: var(--color-ink-2); }
+    .vt-btn.active {
+      background: var(--color-chrome-mid);
       color: var(--color-ink-2);
     }
-    .toolbar-spacer { flex: 1; }
 
-    /* ── Filter pills ── */
+    /* ── Filter Pills ── */
     .filter-group {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
     }
     .filter-pill {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
       height: 22px;
       padding: 0 7px;
-      border-radius: var(--radius-sm);
-      font-family: var(--font-sans);
+      border-radius: 11px;
       font-size: 10px;
-      font-weight: 500;
+      font-weight: 600;
       color: var(--color-ink-3);
       border: 1px solid transparent;
     }
@@ -49,24 +209,18 @@
       border-color: var(--color-accent);
       background: var(--color-accent-soft);
     }
-    .filter-pill .fpill-dot {
+    .fpill-dot {
       width: 5px; height: 5px; border-radius: 50%;
     }
 
-    .filter-sep {
-      width: 1px;
-      height: 14px;
-      background: var(--color-rule-light);
-      margin: 0 4px;
-    }
-
+    /* ── Sort ── */
     .sort-select {
       font-family: var(--font-sans);
       font-size: 10px;
       color: var(--color-ink-3);
       background: transparent;
       border: 1px solid var(--color-rule-light);
-      border-radius: var(--radius-sm);
+      border-radius: 11px;
       padding: 2px 6px;
       height: 22px;
       outline: none;
@@ -75,22 +229,22 @@
     }
     .sort-select:focus { border-color: var(--color-accent); }
 
+    /* ── Search ── */
     .search-box {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
       height: 26px;
-      padding: 0 8px;
-      border-radius: var(--radius-md);
-      background: var(--color-chrome-mid);
+      padding: 0 7px;
+      border-radius: 13px;
       border: 1px solid var(--color-rule-light);
     }
     .search-box:focus-within { border-color: var(--color-accent); }
-    .search-box svg { flex-shrink: 0; color: var(--color-ink-3); }
+    .search-box .icon { color: var(--color-ink-3); flex-shrink: 0; }
     .search-input {
       flex: 1;
       min-width: 0;
-      width: 160px;
+      width: 100px;
       background: transparent;
       border: none;
       font-family: var(--font-sans);
@@ -99,44 +253,49 @@
       outline: none;
       padding: 0;
     }
-    .search-input::placeholder { color: var(--color-ink-3); }
+    .search-input::placeholder { color: var(--color-ink-4); }
 
-    .board {
-      display: flex;
-      gap: var(--space-md);
+    /* ── Content ── */
+    #content {
       flex: 1;
       min-height: 0;
-      padding: var(--space-sm) var(--space-md) var(--space-md);
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ── Board ── */
+    .board {
+      height: 100%;
+      display: flex;
+      gap: 20px;
+      padding: 10px 14px 20px;
       overflow-x: auto;
       scrollbar-width: none;
     }
-    .board::-webkit-scrollbar {
-      width: 0;
-      height: 0;
-    }
+    .board::-webkit-scrollbar { width: 0; height: 0; }
 
-    /* ── Column ── */
     .column {
+      width: 280px;
+      flex: 0 0 280px;
+      min-height: 0;
       display: flex;
       flex-direction: column;
-      min-width: 180px;
-      flex: 1;
     }
     .column.col-hidden {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 6px;
-      min-width: 28px;
-      flex: 0 0 28px;
-      padding: 10px 4px;
-      border-radius: var(--radius-sm);
+      gap: 5px;
+      min-width: 26px;
+      width: 26px;
+      flex: 0 0 26px;
+      padding: 8px 3px;
+      border-radius: 5px;
     }
     .column.col-hidden:hover { background: var(--color-chrome-mid); }
     .col-hidden-label {
       writing-mode: vertical-rl;
       text-orientation: mixed;
-      font-family: var(--font-sans);
       font-size: 10px;
       font-weight: 600;
       color: var(--color-ink-3);
@@ -148,357 +307,516 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: var(--space-sm) 2px;
-      border-bottom: 1px solid var(--color-rule-light);
+      padding: 4px 3px;
+      margin-bottom: 6px;
     }
-    .col-header-menu {
-      margin-left: auto;
-      position: relative;
-      opacity: 0;
-      transition: opacity 0.1s;
-    }
-    .col-header:hover .col-header-menu { opacity: 1; }
-    .col-menu-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 18px;
-      height: 18px;
-      border-radius: var(--radius-sm);
-      color: var(--color-ink-3);
-    }
-    .col-menu-btn:hover { color: var(--color-ink-2); background: var(--color-chrome-mid); }
-    .col-menu {
-      position: absolute;
-      z-index: 50;
-      top: 100%;
-      right: 0;
-      min-width: 140px;
-      padding: 4px;
-      background: var(--color-surface);
-      border: 1px solid var(--color-rule);
-      border-radius: var(--radius-md);
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
-    }
-    .col-menu-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      width: 100%;
-      height: 26px;
-      padding: 0 8px;
-      border-radius: var(--radius-sm);
-      color: var(--color-ink-2);
-      font-family: var(--font-sans);
-      font-size: 11px;
-      text-align: left;
-    }
-    .col-menu-item:hover { background: var(--color-chrome-mid); color: var(--color-ink); }
-
-    .col-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .col-dot--backlog   { background: var(--color-ink-4); }
-    .col-dot--plan      { background: var(--color-ink-3); }
-    .col-dot--in-progress { background: var(--color-accent); }
-    .col-dot--review    { background: color-mix(in srgb, var(--color-accent) 60%, var(--color-ink-3)); }
-    .col-dot--done      { background: var(--color-add); }
-
     .col-label {
-      font-family: var(--font-sans);
-      font-size: 10px;
-      font-weight: 600;
+      font-size: 13px;
+      font-weight: 700;
       color: var(--color-ink-2);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
     }
     .col-count {
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--color-ink-3);
-      background: var(--color-chrome);
-      border-radius: 100px;
-      padding: 1px 5px;
-      min-width: 18px;
-      text-align: center;
     }
+    .col-spacer { flex: 1; }
+    .col-menu-btn {
+      width: 20px; height: 20px;
+      display: grid;
+      place-items: center;
+      border-radius: 4px;
+      color: var(--color-ink-4);
+    }
+    .col-menu-btn:hover { background: var(--color-chrome-mid); color: var(--color-ink-2); }
+    .col-add-btn {
+      width: 20px; height: 20px;
+      display: grid;
+      place-items: center;
+      border-radius: 4px;
+      color: var(--color-ink-4);
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .col-add-btn:hover { background: var(--color-chrome-mid); color: var(--color-ink-2); }
+
     .col-cards {
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      padding-top: var(--space-sm);
+      gap: 5px;
       flex: 1;
       min-height: 40px;
       overflow-y: auto;
-      border-radius: var(--radius-sm);
-      transition: background 0.15s;
+      border-radius: 5px;
+      scrollbar-width: thin;
     }
     .col-empty {
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: var(--space-lg) 0;
-      font-family: var(--font-sans);
-      font-size: 10px;
-      color: var(--color-ink-3);
+      padding: 20px 0;
+      font-size: 11px;
+      color: var(--color-ink-4);
     }
-    .col-add {
-      width: 100%;
-      text-align: left;
-      font-family: var(--font-sans);
-      font-size: 10.5px;
-      color: var(--color-ink-3);
-      padding: 4px 6px;
-      border-radius: var(--radius-sm);
-      margin-top: 2px;
+    .card-add {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 26px;
+      color: var(--color-ink-4);
+      border-radius: 5px;
+      font-size: 13px;
+      font-weight: 500;
       flex-shrink: 0;
     }
-    .col-add:hover { color: var(--color-ink-2); background: var(--color-chrome-mid); }
-
-    .col-drop-active .col-cards {
-      background: var(--color-accent-tint);
-    }
-
-    /* ── Drop indicator line ── */
-    .drop-line {
-      height: 2px;
-      border-radius: 1px;
-      background: var(--color-accent);
-      margin: -1px 4px;
-      flex-shrink: 0;
-    }
+    .card-add:hover { background: var(--color-chrome-mid); color: var(--color-ink-3); }
+    .col-drop-active .col-cards { background: var(--color-accent-tint); }
 
     /* ── Card ── */
     .card {
+      position: relative;
+      min-height: 80px;
+      padding: 8px 10px 7px;
       background: var(--color-surface);
       border: 1px solid var(--color-rule-light);
-      border-radius: var(--radius-md);
-      padding: var(--space-sm);
-      transition: background 0.1s, opacity 0.15s;
+      border-radius: 6px;
     }
     .card:hover { background: var(--color-chrome-high); }
-    .card.dragging { opacity: 0.3; }
-    .card.card--done { opacity: 0.55; }
-    .card.card--done:hover { opacity: 0.75; }
-
-    .card-row {
+    .card.dragging { opacity: 0.35; }
+    .card.card-done { opacity: 0.55; }
+    .card.card-done:hover { opacity: 0.75; }
+    .card-title-row {
       display: flex;
+      gap: 5px;
       align-items: flex-start;
-      gap: 6px;
+      padding-right: 24px;
     }
     .card-title {
-      flex: 1;
-      font-family: var(--font-sans);
-      font-size: 11.5px;
-      font-weight: 500;
-      color: var(--color-ink);
+      font-size: 12px;
       line-height: 1.35;
+      font-weight: 600;
+      color: var(--color-ink);
       overflow: hidden;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
     }
-    .priority-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      flex-shrink: 0;
-      margin-top: 4px;
-    }
-    .priority-dot--urgent   { background: var(--color-rem); }
-    .priority-dot--high     { background: #d08030; }
-    .priority-dot--normal   { background: var(--color-accent); }
-    .priority-dot--low      { background: var(--color-ink-3); }
-
+    .card-status .status-token { margin-top: 1px; }
     .card-meta {
       display: flex;
       align-items: center;
-      gap: 6px;
-      margin-top: 4px;
-    }
-    .card-date {
-      font-family: var(--font-mono);
-      font-size: 9px;
-      color: var(--color-ink-3);
-    }
-    .card-tags {
-      display: flex;
-      gap: 3px;
+      gap: 4px;
+      margin-top: 6px;
       flex-wrap: wrap;
+      min-height: 20px;
     }
-    .card-tag {
-      font-family: var(--font-sans);
-      font-size: 9px;
-      color: var(--color-ink-3);
-      background: var(--color-chrome);
-      border-radius: 3px;
-      padding: 1px 4px;
+    .card-created {
+      margin-top: 5px;
+      font-size: 10px;
+      color: var(--color-ink-4);
     }
-
-    /* ── Inline Add Form ── */
-    .inline-form {
-      background: var(--color-surface);
-      border: 1px solid var(--color-accent);
-      border-radius: var(--radius-md);
-      padding: var(--space-sm);
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
+    .card-assignee {
+      position: absolute;
+      top: 7px;
+      right: 7px;
     }
-    .inline-form input[type="text"] {
-      font-family: var(--font-sans);
-      font-size: 11.5px;
-      border: none;
-      padding: 2px 0;
-      background: transparent;
-      color: var(--color-ink);
-      outline: none;
-    }
-    .inline-form input[type="text"]::placeholder { color: var(--color-ink-3); }
-    .inline-form-row {
-      display: flex;
+    .card-priority { border-radius: 50%; }
+    .card-project {
+      display: inline-flex;
       align-items: center;
-      gap: 6px;
-    }
-    .inline-form select {
-      font-family: var(--font-sans);
+      gap: 3px;
       font-size: 10px;
-      color: var(--color-ink-2);
-      background: var(--color-chrome-mid);
-      border: 1px solid var(--color-rule-light);
-      border-radius: var(--radius-sm);
-      padding: 2px 4px;
-      outline: none;
+      color: var(--color-ink-4);
     }
-    .inline-form-btn {
-      font-family: var(--font-sans);
-      font-size: 10px;
-      font-weight: 500;
-      padding: 2px 8px;
-      border-radius: var(--radius-sm);
-    }
-    .inline-form-btn--save {
-      background: var(--color-accent);
-      color: var(--color-accent-ink);
-    }
-    .inline-form-btn--save:hover { opacity: 0.9; }
-    .inline-form-btn--cancel {
-      color: var(--color-ink-3);
-    }
-    .inline-form-btn--cancel:hover { color: var(--color-ink-2); }
 
-    /* ── Detail Overlay ── */
-    .overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.25);
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-      padding-top: 60px;
-      z-index: 100;
-      opacity: 0;
-      transition: opacity 0.15s;
+    /* ── Status Tokens ── */
+    .status-token {
+      width: 13px; height: 13px;
+      flex: 0 0 13px;
+      border-radius: 50%;
+      display: inline-grid;
+      place-items: center;
     }
-    .overlay.visible { opacity: 1; }
-    .detail {
+    .status-backlog {
+      border: 1.5px dotted var(--color-ink-4);
+    }
+    .status-plan {
+      border: 1.5px solid var(--color-ink-3);
+    }
+    .status-progress {
+      border: 1.5px solid var(--color-accent);
+      background: linear-gradient(to right, var(--color-accent) 50%, transparent 50%);
+    }
+    .status-review {
+      border: 1.5px solid var(--color-accent);
+    }
+    .status-done {
+      background: var(--color-accent);
+    }
+    .status-done::before {
+      content: "";
+      width: 5.5px; height: 3px;
+      border-left: 1.5px solid var(--color-accent-ink, #fff);
+      border-bottom: 1.5px solid var(--color-accent-ink, #fff);
+      transform: rotate(-45deg);
+      margin-top: -1px;
+    }
+
+    /* ── Priority Bars ── */
+    .priority-bars {
+      width: 13px; height: 11px;
+      display: inline-flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 1.5px;
+    }
+    .priority-bars i {
+      width: 2px;
+      border-radius: 1px 1px 0 0;
+      background: currentColor;
+      opacity: .2;
+      font-style: normal;
+    }
+    .fm-priority { color: var(--color-ink-3); }
+
+    /* ── Field Controls ── */
+    .field-ctrl {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      color: var(--color-ink-3);
+      line-height: 1;
+      padding: 2px;
+    }
+    .field-ctrl:hover, .field-ctrl.open {
+      background: var(--color-chrome-mid);
+      border-color: var(--color-rule-light);
+    }
+
+    /* ── Labels ── */
+    .label-pill {
+      height: 20px;
+      padding: 0 7px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid var(--color-rule-light);
+      border-radius: 10px;
+      color: var(--color-ink-3);
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .label-pill.compact { height: 17px; padding: 0 5px; font-size: 10px; }
+    .label-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      flex: 0 0 6px;
+    }
+
+    /* ── Date Chips ── */
+    .date-chip {
+      height: 20px;
+      padding: 0 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      border: 1px solid var(--color-rule-light);
+      border-radius: 10px;
+      color: var(--color-ink-3);
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .date-chip.overdue { color: var(--color-rem, #c0392b); border-color: var(--color-rem, #c0392b); }
+    .date-chip-inline {
+      font-size: 10px;
+      color: var(--color-ink-3);
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .date-chip-inline.overdue { color: var(--color-rem, #c0392b); }
+
+    /* ── Avatars ── */
+    .avatar-sm {
+      width: 20px; height: 20px;
+      flex: 0 0 20px;
+      border-radius: 50%;
+      display: inline-grid;
+      place-items: center;
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--color-accent-ink, #fff);
+      background: var(--color-accent);
+    }
+    .avatar-sm.avatar-empty {
+      background: transparent;
+      border: 1.5px dashed var(--color-ink-4);
+      color: var(--color-ink-4);
+    }
+
+    /* ── Field Menu ── */
+    .field-menu {
+      position: absolute;
+      z-index: 95;
+      width: 220px;
+      padding: 5px;
       background: var(--color-surface);
       border: 1px solid var(--color-rule);
-      border-radius: var(--radius-lg);
-      width: 520px;
-      max-width: 95vw;
-      max-height: calc(100vh - 120px);
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      transform: translateY(8px);
-      transition: transform 0.15s;
+      border-radius: 9px;
+      box-shadow: 0 12px 36px rgba(0,0,0,.14), 0 2px 8px rgba(0,0,0,.06);
+      color: var(--color-ink-2);
+      font-size: 12px;
     }
-    .overlay.visible .detail { transform: translateY(0); }
-
-    .detail-header {
-      display: flex;
-      align-items: flex-start;
-      gap: var(--space-sm);
-      padding: var(--space-md);
-      border-bottom: 1px solid var(--color-rule-light);
-    }
-    .detail-title-input {
-      display: block;
-      flex: 1;
-      background: transparent;
-      border: none;
-      outline: none;
-      font-family: var(--font-sans);
-      font-size: 16px;
-      font-weight: 400;
-      color: var(--color-ink);
-      padding: 0;
-    }
-    .detail-title-input::placeholder { color: var(--color-ink-3); }
-    .detail-close {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 24px;
+    .fm-title {
       height: 24px;
-      border-radius: var(--radius-sm);
-      color: var(--color-ink-3);
-      font-size: 16px;
-      line-height: 1;
-      flex-shrink: 0;
-    }
-    .detail-close:hover { background: var(--color-chrome-mid); color: var(--color-ink-2); }
-
-    .detail-props {
+      padding: 0 7px;
       display: flex;
       align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-      padding: var(--space-sm) var(--space-md);
-      border-bottom: 1px solid var(--color-rule-light);
+      color: var(--color-ink-4);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
     }
-    .prop-pill {
-      position: relative;
+    .fm-item {
+      width: 100%;
+      height: 28px;
+      padding: 0 7px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      border-radius: 5px;
+      color: var(--color-ink-2);
+      text-align: left;
+      font-weight: 600;
+      font-size: 12px;
+    }
+    .fm-item:hover, .fm-item:focus { background: var(--color-chrome-mid); outline: none; }
+    .fm-item.selected { background: var(--color-chrome-mid); }
+    .fm-item-label { flex: 1; min-width: 0; }
+    .fm-check { color: var(--color-accent); font-weight: 800; font-size: 11px; }
+    .fm-icon-muted { width: 13px; text-align: center; color: var(--color-ink-4); }
+    .fm-input {
+      width: 100%;
+      height: 26px;
+      margin: 2px 0;
+      padding: 0 7px;
+      border: 1px solid var(--color-rule-light);
+      border-radius: 5px;
+      font-family: var(--font-sans);
+      font-size: 11px;
+      color: var(--color-ink);
+      background: var(--color-surface);
+      outline: none;
+    }
+    .fm-input:focus { border-color: var(--color-accent); }
+    .fm-input::placeholder { color: var(--color-ink-4); }
+    .fm-date-input {
+      width: 100%;
+      height: 26px;
+      margin: 2px 0;
+      padding: 0 7px;
+      border: 1px solid var(--color-rule-light);
+      border-radius: 5px;
+      font-family: var(--font-sans);
+      font-size: 11px;
+      color: var(--color-ink);
+      background: var(--color-surface);
+      outline: none;
+    }
+    .fm-date-input:focus { border-color: var(--color-accent); }
+    .fm-sep {
+      height: 1px;
+      margin: 3px 4px;
+      background: var(--color-rule-light);
+    }
+    .fm-colors {
+      display: flex;
+      gap: 3px;
+      padding: 2px 7px 4px 28px;
+    }
+    .fm-color-dot {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      border: 1.5px solid transparent;
+    }
+    .fm-color-dot:hover { border-color: var(--color-ink-3); }
+    .fm-color-dot.active { border-color: var(--color-ink); }
+    .fm-color-dot span {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      display: block;
+    }
+
+    /* ── Settings Popover ── */
+    .settings-popover {
+      position: absolute;
+      top: 0;
+      right: 10px;
+      width: 260px;
+      z-index: 30;
+      padding: 12px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-rule);
+      border-radius: 9px;
+      box-shadow: 0 12px 36px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.05);
+      font-size: 12px;
+    }
+    .setting-row {
+      min-height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .setting-label { color: var(--color-ink-3); font-weight: 600; font-size: 11px; }
+    .setting-select {
       display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border: 1px solid var(--color-rule-light);
+      border-radius: 5px;
+      color: var(--color-ink-3);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .settings-sep { height: 1px; margin: 8px 0; background: var(--color-rule-light); }
+    .settings-subhead {
+      margin-bottom: 6px;
+      color: var(--color-ink-3);
+      font-weight: 700;
+      font-size: 11px;
+    }
+    .chip-list { display: flex; flex-wrap: wrap; gap: 4px; }
+    .prop-chip {
+      height: 20px;
+      padding: 0 7px;
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--color-rule-light);
+      border-radius: 10px;
+      background: var(--color-chrome-high);
+      color: var(--color-ink-3);
+      font-size: 10px;
+      font-weight: 650;
+    }
+    .prop-chip:hover { background: var(--color-chrome-mid); }
+    .prop-chip.active {
+      background: var(--color-accent-soft);
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+    }
+
+    /* ── List View ── */
+    .list-view {
+      height: 100%;
+      padding: 4px 8px 14px;
+      overflow-y: auto;
+    }
+    .list-group-head {
+      height: 30px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 10px;
+      color: var(--color-ink-2);
+      font-weight: 700;
+      font-size: 12px;
+      background: var(--color-chrome-high);
+      border-radius: 4px;
+      margin-top: 2px;
+    }
+    .list-group-count {
+      color: var(--color-ink-4);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .list-row {
+      height: 36px;
+      display: grid;
+      grid-template-columns: 26px 58px 20px minmax(0,1fr) auto 24px 50px;
       align-items: center;
       gap: 5px;
-      height: 26px;
-      padding: 0 8px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--color-rule-light);
-      font-family: var(--font-sans);
-      font-size: 11px;
-      color: var(--color-ink-2);
+      padding: 0 12px 0 20px;
+      border-radius: 4px;
     }
-    .prop-pill:hover { background: var(--color-chrome-mid); }
-    .prop-pill select {
-      border: none;
-      background: transparent;
-      font-family: var(--font-sans);
-      font-size: 11px;
-      color: var(--color-ink-2);
-      outline: none;
-      -webkit-appearance: none;
-      appearance: none;
-      padding-right: 2px;
+    .list-row:hover { background: var(--color-chrome-high); }
+    .list-id {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--color-ink-4);
+      font-weight: 600;
+    }
+    .list-title {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--color-ink);
+      font-weight: 600;
+      font-size: 12px;
+    }
+    .list-props {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 5px;
+      min-width: 180px;
+    }
+    .list-assignee { display: grid; place-items: center; }
+    .list-date {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--color-ink-4);
+      text-align: right;
     }
 
-    .detail-body {
-      padding: var(--space-md);
-      flex: 1;
+    /* ── Detail View ── */
+    .detail-layout {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      justify-content: center;
+      padding: 28px 14px 14px;
+      overflow-y: auto;
     }
-    .detail-label {
+    .detail-center {
+      display: grid;
+      grid-template-columns: minmax(360px, 1fr) 240px;
+      gap: 20px;
+      width: 100%;
+      max-width: 920px;
+    }
+    .detail-main { max-width: 660px; }
+    .detail-title {
+      display: block;
+      width: 100%;
+      border: none;
+      outline: none;
       font-family: var(--font-sans);
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--color-ink-3);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--color-ink);
+      background: transparent;
+      padding: 0;
+      margin-bottom: 20px;
+    }
+    .detail-title::placeholder { color: var(--color-ink-4); }
+    .detail-section { margin-bottom: 16px; }
+    .detail-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--color-ink-4);
       text-transform: uppercase;
       letter-spacing: 0.03em;
-      margin-bottom: 6px;
+      margin-bottom: 5px;
     }
     .detail-textarea {
       display: block;
@@ -506,8 +824,8 @@
       min-height: 100px;
       resize: vertical;
       border: 1px solid var(--color-rule-light);
-      border-radius: var(--radius-sm);
-      padding: var(--space-sm);
+      border-radius: 5px;
+      padding: 8px;
       font-family: var(--font-sans);
       font-size: 13px;
       line-height: 1.6;
@@ -516,1066 +834,301 @@
       outline: none;
     }
     .detail-textarea:focus { border-color: var(--color-accent); }
-    .detail-textarea::placeholder { color: var(--color-ink-3); }
-
-    .detail-tags {
-      padding: 0 var(--space-md) var(--space-sm);
-    }
-    .detail-tags-label {
-      font-family: var(--font-sans);
+    .detail-textarea::placeholder { color: var(--color-ink-4); }
+    .detail-rule { height: 1px; background: var(--color-rule-light); margin: 16px 0; }
+    .detail-created-line {
       font-size: 11px;
-      font-weight: 500;
-      color: var(--color-ink-3);
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      margin-bottom: 6px;
+      color: var(--color-ink-4);
+      padding: 4px 0;
     }
-    .detail-tags-row {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      flex-wrap: wrap;
-    }
-    .detail-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      font-family: var(--font-sans);
-      font-size: 10px;
-      color: var(--color-ink-2);
-      background: var(--color-chrome);
-      border-radius: 3px;
-      padding: 2px 6px;
-      height: 20px;
-    }
-    .detail-tag-x {
-      color: var(--color-ink-3);
-      font-size: 12px;
-      line-height: 1;
-    }
-    .detail-tag-x:hover { color: var(--color-ink); }
-    .detail-tag-add {
-      font-family: var(--font-sans);
-      font-size: 10px;
-      color: var(--color-ink-3);
-      padding: 2px 6px;
-      height: 20px;
-      border-radius: 3px;
-    }
-    .detail-tag-add:hover { background: var(--color-chrome-mid); color: var(--color-ink-2); }
-    .detail-tag-input {
-      font-family: var(--font-sans);
-      font-size: 10px;
-      border: 1px solid var(--color-accent);
-      border-radius: 3px;
-      padding: 2px 6px;
-      height: 20px;
-      width: 80px;
-      background: var(--color-surface);
-      color: var(--color-ink);
-      outline: none;
-    }
-
-    .detail-footer {
-      display: flex;
-      align-items: center;
-      gap: var(--space-sm);
-      padding: var(--space-sm) var(--space-md) var(--space-md);
-    }
-    .detail-footer-spacer { flex: 1; }
-    .detail-delete {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      font-family: var(--font-sans);
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--color-rem);
-      padding: 4px 10px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--color-rem);
-    }
-    .detail-delete:hover { background: rgba(192, 93, 60, 0.08); }
-    .detail-date {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--color-ink-3);
-    }
-
-    /* ── Loading ── */
-    .loading {
+    .detail-empty {
       display: flex;
       align-items: center;
       justify-content: center;
-      flex: 1;
-      color: var(--color-ink-3);
-      font-size: 12px;
+      height: 100%;
+      color: var(--color-ink-4);
     }
 
-    /* ── No-folder offer panel ── */
+    /* ── Detail Sidebar ── */
+    .detail-sidebar { padding-top: 2px; }
+    .prop-card {
+      margin-bottom: 6px;
+      padding: 10px 12px;
+      border: 1px solid var(--color-rule-light);
+      border-radius: 7px;
+    }
+    .prop-card-title {
+      margin-bottom: 8px;
+      color: var(--color-ink-3);
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .prop-row {
+      width: 100%;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 5px;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      color: var(--color-ink-2);
+      font-size: 12px;
+      font-weight: 600;
+      text-align: left;
+    }
+    .prop-row:hover { background: var(--color-chrome-mid); border-color: var(--color-rule-light); }
+    .prop-muted { color: var(--color-ink-4); }
+    .prop-add { margin-left: auto; color: var(--color-ink-4); font-size: 13px; }
+    .detail-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--color-ink-4);
+      margin-bottom: 8px;
+    }
+    .detail-delete {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--color-rem, #c0392b);
+      padding: 3px 6px;
+      border-radius: 4px;
+    }
+    .detail-delete:hover { background: rgba(192,60,60,.08); }
+
+    /* ── Create Modal ── */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      background: rgba(0,0,0,.22);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 100px;
+    }
+    .create-modal {
+      width: 580px;
+      max-width: 95vw;
+      background: var(--color-surface);
+      border: 1px solid var(--color-rule);
+      border-radius: 14px;
+      box-shadow: 0 16px 48px rgba(0,0,0,.16), 0 2px 8px rgba(0,0,0,.06);
+      overflow: hidden;
+    }
+    .create-header {
+      height: 34px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 7px;
+      color: var(--color-ink-3);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .create-team {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border: 1px solid var(--color-rule-light);
+      border-radius: 8px;
+      font-size: 11px;
+    }
+    .create-sep { color: var(--color-ink-4); }
+    .create-spacer { flex: 1; }
+    .create-close {
+      width: 22px; height: 22px;
+      display: grid;
+      place-items: center;
+      border-radius: 4px;
+      color: var(--color-ink-3);
+    }
+    .create-close:hover { background: var(--color-chrome-mid); }
+    .create-body { padding: 14px 16px 10px; }
+    .name-prompt {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      color: var(--color-ink-3);
+    }
+    .name-input {
+      flex: 1;
+      border: 1px solid var(--color-accent);
+      border-radius: 5px;
+      padding: 3px 7px;
+      font-family: var(--font-sans);
+      font-size: 12px;
+      color: var(--color-ink);
+      background: var(--color-surface);
+      outline: none;
+    }
+    .create-title {
+      min-height: 26px;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--color-ink);
+      outline: none;
+      margin-bottom: 3px;
+    }
+    .create-title:empty::before {
+      content: attr(data-placeholder);
+      color: var(--color-ink-4);
+    }
+    .create-desc {
+      color: var(--color-ink-4);
+      font-size: 13px;
+      margin-bottom: 14px;
+    }
+    .create-chips {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+    .create-chip {
+      height: 24px;
+      padding: 0 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid var(--color-rule-light);
+      border-radius: 12px;
+      color: var(--color-ink-3);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .create-chip:hover { background: var(--color-chrome-mid); }
+    .create-footer {
+      height: 42px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 8px;
+      border-top: 1px solid var(--color-rule-light);
+    }
+    .create-more-toggle {
+      display: inline-flex;
+      align-items: center;
+    }
+    .toggle-track {
+      width: 26px; height: 14px;
+      padding: 2px;
+      border-radius: 7px;
+      background: var(--color-ink-4);
+      display: inline-flex;
+      align-items: center;
+    }
+    .create-more-toggle.on .toggle-track { background: var(--color-accent); justify-content: flex-end; }
+    .toggle-knob {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--color-surface);
+    }
+    .create-more-label {
+      font-size: 11px;
+      color: var(--color-ink-3);
+      font-weight: 600;
+    }
+    .create-submit {
+      height: 26px;
+      padding: 0 14px;
+      background: var(--color-accent);
+      color: var(--color-accent-ink, #fff);
+      border-radius: 13px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-left: auto;
+    }
+    .create-submit:hover { opacity: .9; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      z-index: 90;
+      left: 50%;
+      bottom: 16px;
+      height: 28px;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      transform: translateX(-50%);
+      border: 1px solid var(--color-rule);
+      border-radius: 14px;
+      background: var(--color-surface);
+      box-shadow: 0 6px 18px rgba(0,0,0,.12);
+      color: var(--color-ink-2);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    /* ── Offer ── */
     .offer {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       flex: 1;
+      height: 100%;
       text-align: center;
-      padding: var(--space-lg);
+      padding: 20px;
     }
-    .offer-title {
-      font-family: var(--font-sans);
-      font-size: 13px;
-      color: var(--color-ink-2);
-      margin-bottom: 4px;
-    }
-    .offer-sub {
-      font-family: var(--font-sans);
-      font-size: 11px;
-      color: var(--color-ink-3);
-      max-width: 260px;
-      line-height: 1.5;
-      margin-bottom: 12px;
-    }
+    .offer-title { font-size: 13px; color: var(--color-ink-2); margin-bottom: 5px; font-weight: 600; }
+    .offer-sub { font-size: 11px; color: var(--color-ink-3); max-width: 240px; line-height: 1.5; margin-bottom: 12px; }
     .offer-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      height: 28px;
+      height: 26px;
       padding: 0 12px;
-      border-radius: var(--radius-md);
+      border-radius: 13px;
       background: var(--color-accent);
-      color: var(--color-accent-ink);
-      font-family: var(--font-sans);
+      color: var(--color-accent-ink, #fff);
       font-size: 11px;
-      font-weight: 500;
+      font-weight: 600;
     }
-    .offer-btn:hover { opacity: 0.9; }
-    .offer-error {
-      font-family: var(--font-sans);
-      font-size: 11px;
-      color: var(--color-danger, #c0392b);
-      max-width: 260px;
-      line-height: 1.5;
-      margin-top: 10px;
+    .offer-btn:hover { opacity: .9; }
+    .offer-error { font-size: 11px; color: var(--color-rem, #c0392b); max-width: 240px; line-height: 1.5; margin-top: 8px; }
+
+    /* ── Loading ── */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--color-ink-4);
+      font-size: 12px;
     }
 
-    /* ── Kbd hint ── */
+    /* ── Keyboard hint ── */
     .kbd-hint {
       position: fixed;
-      bottom: 8px;
-      right: 12px;
+      bottom: 5px;
+      right: 8px;
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size: 8px;
       color: var(--color-ink-4);
+      z-index: 1;
     }
     .kbd-hint kbd {
       background: var(--color-chrome);
       border: 1px solid var(--color-rule-light);
       border-radius: 3px;
-      padding: 1px 4px;
+      padding: 1px 3px;
       font-family: var(--font-mono);
-      font-size: 9px;
-    }
-
-    /* ── Responsive ── */
-    @media (max-width: 600px) {
-      .board {
-        flex-direction: column;
-        gap: var(--space-lg);
-        overflow-x: visible;
-        overflow-y: auto;
-      }
-      .column { min-width: 0; }
-      .filter-group { display: none; }
+      font-size: 8px;
     }
   </style>
 </head>
 <body>
-
-<div class="toolbar">
-  <span class="toolbar-title">Board</span>
-  <div class="filter-group" id="filterGroup">
-    <button class="filter-pill active" data-priority="all">All</button>
-    <button class="filter-pill" data-priority="urgent"><span class="fpill-dot" style="background:var(--color-rem)"></span> Urgent</button>
-    <button class="filter-pill" data-priority="high"><span class="fpill-dot" style="background:#d08030"></span> High</button>
-    <button class="filter-pill" data-priority="normal"><span class="fpill-dot" style="background:var(--color-accent)"></span> Normal</button>
-    <button class="filter-pill" data-priority="low"><span class="fpill-dot" style="background:var(--color-ink-3)"></span> Low</button>
-  </div>
-  <div class="filter-sep"></div>
-  <select class="sort-select" id="sortSelect">
-    <option value="priority">Sort: Priority</option>
-    <option value="date-desc">Sort: Newest</option>
-    <option value="date-asc">Sort: Oldest</option>
-    <option value="alpha">Sort: A-Z</option>
-  </select>
-  <span class="toolbar-spacer"></span>
-  <div class="search-box">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input class="search-input" id="searchInput" type="search" placeholder="Search issues..." autocorrect="off" autocapitalize="off">
-  </div>
-</div>
-
-<div class="board" id="board">
-  <div class="loading" id="loadingMsg">Loading...</div>
-</div>
-
-<!-- Detail overlay -->
-<div class="overlay" id="overlay" style="display:none">
-  <div class="detail" id="detail">
-    <div class="detail-header">
-      <input class="detail-title-input" id="detailTitle" type="text" placeholder="Issue title...">
-      <button class="detail-close" id="detailClose" title="Close">&times;</button>
-    </div>
-    <div class="detail-props">
-      <div class="prop-pill">
-        <span class="col-dot" id="detailStatusDot"></span>
-        <select id="detailStatus"></select>
-      </div>
-      <div class="prop-pill">
-        <span class="priority-dot" id="detailPriorityDot"></span>
-        <select id="detailPriority"></select>
-      </div>
-    </div>
-    <div class="detail-body">
-      <div class="detail-label">Description</div>
-      <textarea class="detail-textarea" id="detailBody" placeholder="Write here..."></textarea>
-    </div>
-    <div class="detail-tags" id="detailTagsSection">
-      <div class="detail-tags-label">Labels</div>
-      <div class="detail-tags-row" id="detailTagsRow"></div>
-    </div>
-    <div class="detail-footer">
-      <span class="detail-date" id="detailDate"></span>
-      <span class="detail-footer-spacer"></span>
-      <button class="detail-delete" id="detailDelete">Delete</button>
-    </div>
-  </div>
-</div>
-
-<div class="kbd-hint"><kbd>N</kbd> new &nbsp; <kbd>/</kbd> search</div>
-
-<script type="module">
-import { runtime } from '/sdk/mim.js'
-
-// ── Constants ──
-
-const STATUSES = ['backlog', 'plan', 'in-progress', 'review', 'done']
-const STATUS_LABELS = {
-  'backlog': 'Backlog',
-  'plan': 'Plan',
-  'in-progress': 'In Progress',
-  'review': 'Review',
-  'done': 'Done',
-}
-const PRIORITIES = ['urgent', 'high', 'normal', 'low']
-const PRIORITY_LABELS = {
-  'urgent': 'Urgent',
-  'high': 'High',
-  'normal': 'Normal',
-  'low': 'Low',
-}
-const PRIORITY_WEIGHT = { urgent: 4, high: 3, normal: 2, low: 1 }
-
-// Lenient mapping for legacy in-list values so the board never crashes on old data.
-const STATUS_ALIAS = { todo: 'backlog' }
-const PRIORITY_ALIAS = { critical: 'urgent', medium: 'normal', none: 'normal' }
-
-function normStatus(s) {
-  if (STATUS_ALIAS[s]) return STATUS_ALIAS[s]
-  return STATUSES.includes(s) ? s : 'backlog'
-}
-function normPriority(p) {
-  if (PRIORITY_ALIAS[p]) return PRIORITY_ALIAS[p]
-  return PRIORITIES.includes(p) ? p : 'normal'
-}
-
-// Normalize a server entity (issues.list item or issues.get result) into the
-// flat shape the board renders. `body` is present only after issues.get.
-function normIssue(raw) {
-  return {
-    id: raw.id,
-    title: raw.title || '',
-    status: normStatus(raw.status),
-    priority: normPriority(raw.priority),
-    tags: Array.isArray(raw.tags) ? raw.tags : [],
-    created: raw.created || '',
-    updated: raw.updated || '',
-    body: typeof raw.body === 'string' ? raw.body : undefined,
-  }
-}
-
-// ── State ──
-
-let issues = []
-let folderPresent = true
-let searchQuery = ''
-let priorityFilter = 'all'  // 'all' | 'urgent' | 'high' | 'normal' | 'low'
-let sortMode = 'priority'   // 'priority' | 'date-desc' | 'date-asc' | 'alpha'
-let hiddenStatuses = new Set()
-let openDetailId = null
-let addingInColumn = null
-let dragEntryId = null
-let dragOverStatus = null
-let dragOverIndex = -1  // insertion index within column
-let saveTimer = null     // debounce timer for detail saves
-
-// ── Data access (core tools via runtime SDK) ──
-
-async function loadIssues() {
-  const result = await runtime.call('issues.list', {})
-  folderPresent = result.folderPresent !== false
-  issues = (result.items || []).map(normIssue)
-}
-
-// Persist the mutable fields of an issue to the core tool. Returns the
-// server's updated entity merged back into the local cache.
-async function saveIssue(issue) {
-  const result = await runtime.call('issues.update', {
-    id: issue.id,
-    title: issue.title,
-    status: issue.status,
-    priority: issue.priority,
-    tags: issue.tags,
-    body: issue.body || '',
-  })
-  if (result && result.folderPresent === false) { folderPresent = false; return }
-  if (result && result.id) {
-    const merged = normIssue(result)
-    // Preserve a loaded body even if a list-style result came back.
-    if (merged.body === undefined) merged.body = issue.body
-    const idx = issues.findIndex(i => i.id === issue.id)
-    if (idx !== -1) issues[idx] = merged
-  }
-}
-
-async function createIssue(title, priority, status) {
-  const result = await runtime.call('issues.create', {
-    title,
-    status: status || 'backlog',
-    priority: priority || 'normal',
-  })
-  if (!result || result.folderPresent === false) { folderPresent = false; render(); return null }
-  const issue = normIssue(result)
-  if (issue.body === undefined) issue.body = ''
-  issues.push(issue)
-  return issue
-}
-
-async function deleteIssue(id) {
-  const issue = issues.find(i => i.id === id)
-  if (!issue) return
-  await runtime.call('issues.delete', { id })
-  issues = issues.filter(i => i.id !== id)
-}
-
-// Lazily fetch the full body for an issue (list items omit it).
-async function ensureBody(issue) {
-  if (typeof issue.body === 'string') return issue.body
-  try {
-    const full = await runtime.call('issues.get', { id: issue.id })
-    issue.body = typeof full.body === 'string' ? full.body : ''
-  } catch {
-    issue.body = ''
-  }
-  return issue.body
-}
-
-// ── Filtering & Sorting ──
-
-function getFilteredIssues(status) {
-  const q = searchQuery.toLowerCase()
-  let result = issues
-    .filter(i => i.status === status)
-    .filter(i => {
-      if (!q) return true
-      return (i.title || '').toLowerCase().includes(q) || (i.body || '').toLowerCase().includes(q)
-    })
-    .filter(i => {
-      if (priorityFilter === 'all') return true
-      return i.priority === priorityFilter
-    })
-
-  // Sort
-  switch (sortMode) {
-    case 'priority':
-      result.sort((a, b) => (PRIORITY_WEIGHT[b.priority] || 0) - (PRIORITY_WEIGHT[a.priority] || 0))
-      break
-    case 'date-desc':
-      result.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0))
-      break
-    case 'date-asc':
-      result.sort((a, b) => new Date(a.created || 0) - new Date(b.created || 0))
-      break
-    case 'alpha':
-      result.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
-      break
-  }
-
-  return result
-}
-
-// ── Render ──
-
-const boardEl = document.getElementById('board')
-const loadingEl = document.getElementById('loadingMsg')
-
-// Offer-not-block panel shown when the issues/ folder does not exist.
-function renderOffer() {
-  const wrap = document.createElement('div')
-  wrap.className = 'offer'
-  wrap.innerHTML = `
-    <div class="offer-title">No issues/ folder yet</div>
-    <div class="offer-sub">The Board stores issues in an <code>issues/</code> folder in your workspace. Create it to start tracking work.</div>
-    <button class="offer-btn" id="offerCreate">Create issues folder</button>
-    <div class="offer-error" id="offerError" hidden></div>
-  `
-  boardEl.appendChild(wrap)
-  const btn = wrap.querySelector('#offerCreate')
-  const errEl = wrap.querySelector('#offerError')
-  btn.addEventListener('click', async () => {
-    btn.disabled = true
-    errEl.hidden = true
-    try {
-      await runtime.call('app.enable', { app: 'issues' })
-      await loadIssues()
-      render()
-    } catch (err) {
-      console.warn('[board] enable error:', err)
-      errEl.textContent = 'Could not create the issues folder: ' + (err && err.message ? err.message : String(err))
-      errEl.hidden = false
-      btn.disabled = false
-    }
-  })
-}
-
-function render() {
-  boardEl.innerHTML = ''
-
-  if (!folderPresent) {
-    renderOffer()
-    return
-  }
-
-  for (const status of STATUSES) {
-    // Hidden/collapsed column
-    if (hiddenStatuses.has(status)) {
-      const allInCol = issues.filter(i => i.status === status)
-      const colEl = document.createElement('div')
-      colEl.className = 'column col-hidden'
-      colEl.dataset.status = status
-      colEl.innerHTML = `
-        <span class="col-dot col-dot--${status}"></span>
-        <span class="col-count">${allInCol.length}</span>
-        <span class="col-hidden-label">${STATUS_LABELS[status]}</span>
-      `
-      colEl.addEventListener('click', () => {
-        hiddenStatuses.delete(status)
-        render()
-      })
-      // Allow dropping on collapsed columns
-      colEl.addEventListener('dragover', (e) => {
-        e.preventDefault()
-        e.dataTransfer.dropEffect = 'move'
-        if (dragOverStatus !== status) { dragOverStatus = status; dragOverIndex = 0 }
-      })
-      colEl.addEventListener('drop', (e) => {
-        e.preventDefault()
-        const entryId = e.dataTransfer.getData('text/plain')
-        dragOverStatus = null; dragOverIndex = -1; dragEntryId = null
-        if (entryId) handleDrop(entryId, status, 0)
-      })
-      boardEl.appendChild(colEl)
-      continue
-    }
-
-    const colEntries = getFilteredIssues(status)
-
-    const colEl = document.createElement('div')
-    colEl.className = 'column'
-    if (dragOverStatus === status && dragEntryId) colEl.classList.add('col-drop-active')
-    colEl.dataset.status = status
-
-    // Header
-    const header = document.createElement('div')
-    header.className = 'col-header'
-    header.innerHTML = `
-      <span class="col-dot col-dot--${status}"></span>
-      <span class="col-label">${STATUS_LABELS[status]}</span>
-      <span class="col-count">${colEntries.length}</span>
-      <div class="col-header-menu">
-        <button class="col-menu-btn" data-menu-toggle="${status}">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
-        </button>
-      </div>
-    `
-    colEl.appendChild(header)
-
-    // Cards container
-    const cardsEl = document.createElement('div')
-    cardsEl.className = 'col-cards'
-
-    // Drop zone events on cards container
-    cardsEl.addEventListener('dragover', (e) => {
-      e.preventDefault()
-      e.dataTransfer.dropEffect = 'move'
-      dragOverStatus = status
-
-      // Calculate drop index based on cursor Y position
-      const cards = cardsEl.querySelectorAll('.card')
-      let newIndex = cards.length
-      for (let i = 0; i < cards.length; i++) {
-        const rect = cards[i].getBoundingClientRect()
-        const midY = rect.top + rect.height / 2
-        if (e.clientY < midY) {
-          newIndex = i
-          break
-        }
-      }
-      if (dragOverIndex !== newIndex) {
-        dragOverIndex = newIndex
-        render()
-      }
-    })
-    cardsEl.addEventListener('dragleave', (e) => {
-      if (!colEl.contains(e.relatedTarget)) {
-        if (dragOverStatus === status) {
-          dragOverStatus = null
-          dragOverIndex = -1
-          render()
-        }
-      }
-    })
-    cardsEl.addEventListener('drop', (e) => {
-      e.preventDefault()
-      const entryId = e.dataTransfer.getData('text/plain')
-      const dropIdx = dragOverIndex
-      dragOverStatus = null
-      dragOverIndex = -1
-      dragEntryId = null
-      if (entryId) handleDrop(entryId, status, dropIdx)
-    })
-
-    if (colEntries.length === 0 && addingInColumn !== status && !(dragOverStatus === status && dragEntryId)) {
-      const empty = document.createElement('div')
-      empty.className = 'col-empty'
-      empty.textContent = 'No issues'
-      cardsEl.appendChild(empty)
-    }
-
-    for (let i = 0; i < colEntries.length; i++) {
-      // Drop line before card
-      if (dragOverStatus === status && dragOverIndex === i && dragEntryId) {
-        const line = document.createElement('div')
-        line.className = 'drop-line'
-        cardsEl.appendChild(line)
-      }
-      const card = renderCard(colEntries[i], status)
-      cardsEl.appendChild(card)
-    }
-    // Drop line at end
-    if (dragOverStatus === status && dragOverIndex === colEntries.length && dragEntryId) {
-      const line = document.createElement('div')
-      line.className = 'drop-line'
-      cardsEl.appendChild(line)
-    }
-
-    colEl.appendChild(cardsEl)
-
-    // Inline add form or add button
-    if (addingInColumn === status) {
-      colEl.appendChild(renderInlineForm(status))
-    } else {
-      const addBtn = document.createElement('button')
-      addBtn.className = 'col-add'
-      addBtn.textContent = '+ Add issue'
-      addBtn.addEventListener('click', () => {
-        addingInColumn = status
-        render()
-        requestAnimationFrame(() => {
-          const inp = boardEl.querySelector('.inline-form input[type="text"]')
-          if (inp) inp.focus()
-        })
-      })
-      colEl.appendChild(addBtn)
-    }
-
-    boardEl.appendChild(colEl)
-  }
-}
-
-function renderCard(issue, colStatus) {
-  const card = document.createElement('div')
-  card.className = 'card'
-  card.draggable = true
-  card.dataset.id = issue.id
-
-  if (dragEntryId === issue.id) card.classList.add('dragging')
-  if (colStatus === 'done') card.classList.add('card--done')
-
-  // Drag events
-  card.addEventListener('dragstart', (e) => {
-    dragEntryId = issue.id
-    e.dataTransfer.setData('text/plain', issue.id)
-    e.dataTransfer.effectAllowed = 'move'
-    requestAnimationFrame(() => render())
-  })
-  card.addEventListener('dragend', () => {
-    dragEntryId = null
-    dragOverStatus = null
-    dragOverIndex = -1
-    render()
-  })
-
-  // Click to open detail
-  card.addEventListener('click', () => openDetail(issue.id))
-
-  const row = document.createElement('div')
-  row.className = 'card-row'
-
-  const titleSpan = document.createElement('span')
-  titleSpan.className = 'card-title'
-  titleSpan.textContent = issue.title || '(untitled)'
-  row.appendChild(titleSpan)
-
-  const dot = document.createElement('span')
-  dot.className = `priority-dot priority-dot--${issue.priority || 'normal'}`
-  row.appendChild(dot)
-
-  card.appendChild(row)
-
-  // Meta row: date + tags
-  const hasMeta = issue.created || (issue.tags && issue.tags.length > 0)
-  if (hasMeta) {
-    const metaRow = document.createElement('div')
-    metaRow.className = 'card-meta'
-
-    if (issue.created) {
-      const dateSpan = document.createElement('span')
-      dateSpan.className = 'card-date'
-      dateSpan.textContent = formatDate(issue.created)
-      metaRow.appendChild(dateSpan)
-    }
-
-    if (issue.tags && issue.tags.length > 0) {
-      const tagsDiv = document.createElement('div')
-      tagsDiv.className = 'card-tags'
-      for (const tag of issue.tags.slice(0, 3)) {
-        const tagEl = document.createElement('span')
-        tagEl.className = 'card-tag'
-        tagEl.textContent = tag
-        tagsDiv.appendChild(tagEl)
-      }
-      metaRow.appendChild(tagsDiv)
-    }
-
-    card.appendChild(metaRow)
-  }
-
-  return card
-}
-
-function renderInlineForm(status) {
-  const form = document.createElement('div')
-  form.className = 'inline-form'
-
-  const titleInput = document.createElement('input')
-  titleInput.type = 'text'
-  titleInput.placeholder = 'Issue title...'
-
-  const row = document.createElement('div')
-  row.className = 'inline-form-row'
-
-  const select = document.createElement('select')
-  for (const p of PRIORITIES) {
-    const opt = document.createElement('option')
-    opt.value = p
-    opt.textContent = PRIORITY_LABELS[p]
-    if (p === 'normal') opt.selected = true
-    select.appendChild(opt)
-  }
-
-  const saveBtn = document.createElement('button')
-  saveBtn.className = 'inline-form-btn inline-form-btn--save'
-  saveBtn.textContent = 'Add'
-  saveBtn.addEventListener('click', async () => {
-    const title = titleInput.value.trim()
-    if (!title) return
-    const created = await createIssue(title, select.value, status)
-    if (created === null) return  // folder vanished; offer panel now shown
-    addingInColumn = null
-    render()
-  })
-
-  const cancelBtn = document.createElement('button')
-  cancelBtn.className = 'inline-form-btn inline-form-btn--cancel'
-  cancelBtn.textContent = 'Cancel'
-  cancelBtn.addEventListener('click', () => {
-    addingInColumn = null
-    render()
-  })
-
-  row.appendChild(select)
-  row.appendChild(document.createElement('span')).style.flex = '1'
-  row.appendChild(cancelBtn)
-  row.appendChild(saveBtn)
-
-  form.appendChild(titleInput)
-  form.appendChild(row)
-
-  titleInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      saveBtn.click()
-    }
-    if (e.key === 'Escape') {
-      e.preventDefault()
-      addingInColumn = null
-      render()
-    }
-  })
-
-  return form
-}
-
-// ── Drag & Drop ──
-
-async function handleDrop(entryId, newStatus, dropIndex) {
-  const issue = issues.find(i => i.id === entryId)
-  if (!issue) return
-  if (issue.status === newStatus && dropIndex === undefined) { render(); return }
-  await ensureBody(issue)
-  issue.status = newStatus
-  render()
-  await saveIssue(issue)
-  render()
-}
-
-// ── Detail Overlay ──
-
-const overlayEl = document.getElementById('overlay')
-const detailEl = document.getElementById('detail')
-const detailTitleEl = document.getElementById('detailTitle')
-const detailStatusEl = document.getElementById('detailStatus')
-const detailStatusDotEl = document.getElementById('detailStatusDot')
-const detailPriorityEl = document.getElementById('detailPriority')
-const detailPriorityDotEl = document.getElementById('detailPriorityDot')
-const detailBodyEl = document.getElementById('detailBody')
-const detailDateEl = document.getElementById('detailDate')
-const detailDeleteEl = document.getElementById('detailDelete')
-const detailCloseEl = document.getElementById('detailClose')
-const detailTagsRowEl = document.getElementById('detailTagsRow')
-
-// Populate selects
-for (const s of STATUSES) {
-  const opt = document.createElement('option')
-  opt.value = s
-  opt.textContent = STATUS_LABELS[s]
-  detailStatusEl.appendChild(opt)
-}
-for (const p of PRIORITIES) {
-  const opt = document.createElement('option')
-  opt.value = p
-  opt.textContent = PRIORITY_LABELS[p]
-  detailPriorityEl.appendChild(opt)
-}
-
-async function openDetail(id) {
-  const issue = issues.find(i => i.id === id)
-  if (!issue) return
-  openDetailId = id
-  detailTitleEl.value = issue.title || ''
-  detailStatusEl.value = issue.status || 'backlog'
-  detailStatusDotEl.className = `col-dot col-dot--${issue.status || 'backlog'}`
-  detailPriorityEl.value = issue.priority || 'normal'
-  detailPriorityDotEl.className = `priority-dot priority-dot--${issue.priority || 'normal'}`
-  detailBodyEl.value = ''
-  detailDateEl.textContent = issue.created ? 'Created ' + formatDate(issue.created) : ''
-  renderDetailTags()
-  overlayEl.style.display = 'flex'
-  requestAnimationFrame(() => {
-    overlayEl.classList.add('visible')
-    detailTitleEl.focus()
-  })
-  // Body is omitted from list items; fetch it lazily.
-  await ensureBody(issue)
-  if (openDetailId === id) detailBodyEl.value = issue.body || ''
-}
-
-function closeDetail() {
-  if (openDetailId) saveDetailChangesImmediate()
-  openDetailId = null
-  overlayEl.classList.remove('visible')
-  setTimeout(() => {
-    overlayEl.style.display = 'none'
-  }, 150)
-  render()
-}
-
-function scheduleDetailSave() {
-  if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => {
-    saveDetailChangesImmediate()
-  }, 600)
-}
-
-function saveDetailChangesImmediate() {
-  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null }
-  const issue = issues.find(i => i.id === openDetailId)
-  if (!issue) return
-  issue.title = detailTitleEl.value.trim() || issue.title
-  issue.status = detailStatusEl.value
-  issue.priority = detailPriorityEl.value
-  issue.body = detailBodyEl.value
-  saveIssue(issue)
-}
-
-function renderDetailTags() {
-  const issue = issues.find(i => i.id === openDetailId)
-  if (!issue) return
-  const tags = issue.tags || []
-  detailTagsRowEl.innerHTML = ''
-  for (const tag of tags) {
-    const el = document.createElement('span')
-    el.className = 'detail-tag'
-    el.innerHTML = `${tag} <button class="detail-tag-x" data-tag="${tag}">&times;</button>`
-    detailTagsRowEl.appendChild(el)
-  }
-  const addBtn = document.createElement('button')
-  addBtn.className = 'detail-tag-add'
-  addBtn.textContent = '+ Add'
-  addBtn.addEventListener('click', () => startTagInput())
-  detailTagsRowEl.appendChild(addBtn)
-}
-
-function startTagInput() {
-  // Replace + Add with input
-  const existing = detailTagsRowEl.querySelector('.detail-tag-add')
-  if (existing) existing.remove()
-  const input = document.createElement('input')
-  input.className = 'detail-tag-input'
-  input.placeholder = 'tag...'
-  detailTagsRowEl.appendChild(input)
-  input.focus()
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      const val = input.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '')
-      if (val) {
-        const issue = issues.find(i => i.id === openDetailId)
-        if (issue) {
-          if (!issue.tags) issue.tags = []
-          if (!issue.tags.includes(val)) {
-            issue.tags.push(val)
-            saveDetailChangesImmediate()
-          }
-        }
-      }
-      renderDetailTags()
-    }
-    if (e.key === 'Escape') {
-      renderDetailTags()
-    }
-  })
-  input.addEventListener('blur', () => renderDetailTags())
-}
-
-// Tag removal via delegation
-detailTagsRowEl.addEventListener('click', (e) => {
-  const btn = e.target.closest('.detail-tag-x')
-  if (!btn) return
-  const tag = btn.dataset.tag
-  const issue = issues.find(i => i.id === openDetailId)
-  if (issue && tag) {
-    issue.tags = (issue.tags || []).filter(t => t !== tag)
-    saveDetailChangesImmediate()
-    renderDetailTags()
-  }
-})
-
-// Close on overlay click (not detail click)
-overlayEl.addEventListener('click', (e) => {
-  if (e.target === overlayEl) closeDetail()
-})
-
-// Close button
-detailCloseEl.addEventListener('click', () => closeDetail())
-
-// Update dots and debounce save when selects change
-detailStatusEl.addEventListener('change', () => {
-  detailStatusDotEl.className = `col-dot col-dot--${detailStatusEl.value}`
-  scheduleDetailSave()
-})
-detailPriorityEl.addEventListener('change', () => {
-  detailPriorityDotEl.className = `priority-dot priority-dot--${detailPriorityEl.value}`
-  scheduleDetailSave()
-})
-
-// Debounce save on title/body input
-detailTitleEl.addEventListener('input', scheduleDetailSave)
-detailBodyEl.addEventListener('input', scheduleDetailSave)
-
-// Delete button
-detailDeleteEl.addEventListener('click', async () => {
-  const id = openDetailId
-  if (!id) return
-  openDetailId = null
-  overlayEl.classList.remove('visible')
-  setTimeout(() => { overlayEl.style.display = 'none' }, 150)
-  await deleteIssue(id)
-  render()
-})
-
-// ── Column menu (hide) ──
-
-document.addEventListener('click', (e) => {
-  const toggleBtn = e.target.closest('[data-menu-toggle]')
-  if (toggleBtn) {
-    const status = toggleBtn.dataset.menuToggle
-    // Show menu
-    const menuEl = document.createElement('div')
-    menuEl.className = 'col-menu'
-    menuEl.innerHTML = `<button class="col-menu-item" data-hide-col="${status}">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-      Hide column
-    </button>`
-    toggleBtn.parentElement.appendChild(menuEl)
-
-    const cleanup = (ev) => {
-      if (!menuEl.contains(ev.target) && ev.target !== toggleBtn) {
-        menuEl.remove()
-        document.removeEventListener('click', cleanup)
-      }
-    }
-    setTimeout(() => document.addEventListener('click', cleanup), 0)
-    return
-  }
-
-  const hideBtn = e.target.closest('[data-hide-col]')
-  if (hideBtn) {
-    const status = hideBtn.dataset.hideCol
-    hiddenStatuses.add(status)
-    render()
-  }
-})
-
-// ── Keyboard shortcuts ──
-
-document.addEventListener('keydown', (e) => {
-  // Don't intercept when in inputs
-  const inInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)
-
-  if (e.key === 'Escape') {
-    if (openDetailId) {
-      closeDetail()
-      return
-    }
-    if (addingInColumn) {
-      addingInColumn = null
-      render()
-      return
-    }
-  }
-
-  if (inInput) return
-
-  // N = new issue in first visible column
-  if (e.key === 'n' || e.key === 'N') {
-    e.preventDefault()
-    const firstVisible = STATUSES.find(s => !hiddenStatuses.has(s)) || 'backlog'
-    addingInColumn = firstVisible
-    render()
-    requestAnimationFrame(() => {
-      const inp = boardEl.querySelector('.inline-form input[type="text"]')
-      if (inp) inp.focus()
-    })
-    return
-  }
-
-  // / = focus search
-  if (e.key === '/') {
-    e.preventDefault()
-    document.getElementById('searchInput').focus()
-    return
-  }
-})
-
-// ── Helpers ──
-
-function formatDate(isoStr) {
-  try {
-    const d = new Date(isoStr)
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-  } catch { return '' }
-}
-
-// ── Search ──
-
-document.getElementById('searchInput').addEventListener('input', (e) => {
-  searchQuery = e.target.value
-  render()
-})
-
-// ── Priority filter ──
-
-document.getElementById('filterGroup').addEventListener('click', (e) => {
-  const pill = e.target.closest('.filter-pill')
-  if (!pill) return
-  const val = pill.dataset.priority
-  if (!val) return
-  priorityFilter = val
-  // Update active class
-  document.querySelectorAll('.filter-pill').forEach(el => el.classList.remove('active'))
-  pill.classList.add('active')
-  render()
-})
-
-// ── Sort ──
-
-document.getElementById('sortSelect').addEventListener('change', (e) => {
-  sortMode = e.target.value
-  render()
-})
-
-// ── Init ──
-
-async function init() {
-  try {
-    await loadIssues()
-  } catch (err) {
-    console.warn('[board] init error:', err)
-  }
-  loadingEl.remove()
-  render()
-}
-
-// Reload when workspace changes
-runtime.on('workspace:changed', async () => {
-  issues = []
-  boardEl.innerHTML = ''
-  const loader = document.createElement('div')
-  loader.className = 'loading'
-  loader.textContent = 'Loading...'
-  boardEl.appendChild(loader)
-  try {
-    await loadIssues()
-  } catch (err) {
-    console.warn('[board] reload error:', err)
-  }
-  loader.remove()
-  render()
-})
-
-// Reload when a core app is enabled/disabled elsewhere (mim.yaml flag changed; enable also creates the folder).
-runtime.on('apps:changed', async () => {
-  try {
-    await loadIssues()
-  } catch (err) {
-    console.warn('[board] apps:changed reload error:', err)
-  }
-  render()
-})
-
-init()
-</script>
+  <div id="app"></div>
+  <script type="module">
+    import { init } from './js/render.js'
+    init()
+  </script>
 </body>
 </html>
