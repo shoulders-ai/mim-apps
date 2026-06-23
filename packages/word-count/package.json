@@ -1,0 +1,31 @@
+{
+  "name": "@mim/word-count",
+  "version": "0.1.0",
+  "type": "module",
+  "mim": {
+    "manifestVersion": 1,
+    "id": "word-count",
+    "name": "Word Count",
+    "description": "Count words, characters, and lines from pasted text or a workspace text file.",
+    "icon": "W",
+    "views": [],
+    "backend": "./backend/index.mjs",
+    "permissions": {
+      "workspace": {
+        "read": true
+      }
+    },
+    "provides": {
+      "tools": [
+        {
+          "name": "word_count.analyze",
+          "category": "read",
+          "risk": "low"
+        }
+      ]
+    },
+    "engines": {
+      "mim": "runtime-v1"
+    }
+  }
+}
