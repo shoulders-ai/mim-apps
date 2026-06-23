@@ -9,12 +9,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Auto-bump versions for changed packages
+        run: node scripts/auto-bump.mjs
+
+      - name: Commit version bumps if any
+        run: |
+          git diff --quiet -- packages/*/package.json && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/*/package.json
+          git commit -m "chore: auto-bump package versions [skip ci]"
+          git push
 
       - run: node scripts/build-registry.mjs
 
       - name: Commit index.json if changed
         run: |
-          git diff --quiet index.json && exit 0
+          git diff --quiet -- index.json && exit 0
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.json

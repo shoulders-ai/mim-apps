@@ -32,7 +32,7 @@ packages/<id>/
 
 ### Publishing
 
-Bump `version` in `packages/<id>/package.json` and push to `main`. CI regenerates `index.json` from every package manifest and the current commit. Users see updates in Settings > Apps on next refresh.
+Push package changes to `main`. CI patch-bumps changed packages automatically, then regenerates `index.json`. For a minor or major release, edit `version` in `packages/<id>/package.json` before pushing; CI preserves that manual bump and only updates the registry.
 
 Packages hosted in other repos can be added to `external.json`. The registry build merges them into `index.json` alongside local packages.
 
