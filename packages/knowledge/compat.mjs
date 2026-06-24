@@ -8,7 +8,7 @@ export async function smoke({ tools }) {
     tags: ['compat'],
     body: 'Created by the Mim compatibility gate.',
   }, ctx)
-  assert.match(created.id, /^knowledge-\d+-[a-z0-9]{4}$/)
+  assert.equal(created.id, 'compat-note')
   assert.equal(created.title, 'Compat note')
 
   const got = await tools.call('knowledge.get', { id: created.id }, ctx)
@@ -23,6 +23,9 @@ export async function smoke({ tools }) {
 
   const listed = await tools.call('knowledge.list', {}, ctx)
   assert.ok(listed.items.some(item => item.id === created.id))
+
+  const catalog = await tools.call('knowledge.catalog', {}, ctx)
+  assert.ok(catalog.entries.some(item => item.id === created.id))
 
   await tools.call('knowledge.delete', { id: created.id }, ctx)
   const after = await tools.call('knowledge.list', {}, ctx)

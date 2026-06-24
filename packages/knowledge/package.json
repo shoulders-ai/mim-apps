@@ -18,9 +18,13 @@
     "provides": {
       "tools": [
         { "name": "knowledge.list", "category": "read", "risk": "low" },
+        { "name": "knowledge.catalog", "category": "read", "risk": "low" },
         { "name": "knowledge.get", "category": "read", "risk": "low" },
         { "name": "knowledge.create", "category": "write", "risk": "medium" },
         { "name": "knowledge.update", "category": "write", "risk": "medium" },
+        { "name": "knowledge.neighbors", "category": "read", "risk": "low" },
+        { "name": "knowledge.graph", "category": "read", "risk": "low" },
+        { "name": "knowledge.search", "category": "read", "risk": "low" },
         { "name": "knowledge.delete", "category": "write", "risk": "high" }
       ]
     },

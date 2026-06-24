@@ -107,6 +107,41 @@
     }
     .sort-toggle:hover { color: var(--color-ink-2); background: var(--color-chrome-mid); }
 
+    .view-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 2px;
+      border-radius: var(--radius-sm);
+      background: var(--color-chrome-mid);
+      border: 1px solid var(--color-rule-light);
+    }
+    .view-toggle-btn {
+      height: 20px;
+      padding: 0 7px;
+      border-radius: 3px;
+      font-family: var(--font-sans);
+      font-size: 10px;
+      color: var(--color-ink-3);
+    }
+    .view-toggle-btn:hover { background: var(--color-chrome-high); color: var(--color-ink-2); }
+    .view-toggle-btn--active {
+      background: var(--color-surface);
+      color: var(--color-ink);
+    }
+    .type-filter {
+      height: 26px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-rule-light);
+      background: var(--color-chrome-mid);
+      color: var(--color-ink-2);
+      font-family: var(--font-sans);
+      font-size: 11px;
+      padding: 0 7px;
+      outline: none;
+    }
+    .type-filter:focus { border-color: var(--color-accent); }
+
     /* ── Content Area ── */
     .content {
       flex: 1;
@@ -144,6 +179,14 @@
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
+    }
+    .card-type {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0;
+      color: var(--color-ink-3);
+      margin-bottom: 3px;
     }
     .card-tags {
       display: flex;
@@ -229,6 +272,71 @@
       color: var(--color-danger, #c0392b);
       max-width: 240px;
       line-height: 1.5;
+    }
+    .empty-content {
+      color: var(--color-ink-3);
+      font-style: italic;
+    }
+
+    /* ── Graph View ── */
+    .graph-shell {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+    .graph-meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--color-ink-3);
+    }
+    .graph-canvas {
+      flex: 1;
+      min-height: 520px;
+      border: 1px solid var(--color-rule-light);
+      border-radius: var(--radius-lg);
+      background: var(--color-surface);
+      overflow: hidden;
+    }
+    .graph-svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 520px;
+    }
+    .graph-edge {
+      stroke: var(--color-rule);
+      stroke-width: 1;
+      opacity: 0.75;
+    }
+    .graph-edge--missing {
+      stroke-dasharray: 4 4;
+      opacity: 0.45;
+    }
+    .graph-node circle {
+      stroke: var(--color-surface);
+      stroke-width: 2;
+    }
+    .graph-node:hover circle {
+      stroke: var(--color-accent);
+    }
+    .graph-node text {
+      font-family: var(--font-sans);
+      font-size: 10px;
+      fill: var(--color-ink-2);
+      paint-order: stroke;
+      stroke: var(--color-surface);
+      stroke-width: 3px;
+      stroke-linejoin: round;
+    }
+    .graph-node-type {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      text-transform: uppercase;
+      fill: var(--color-ink-4);
     }
 
     /* ── Loading ── */
@@ -325,6 +433,45 @@
     }
     .detail-tags-input::placeholder { color: var(--color-ink-3); }
 
+    .detail-meta-row {
+      display: grid;
+      grid-template-columns: 120px minmax(0, 1fr);
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      border-bottom: 1px solid var(--color-rule-light);
+    }
+    .detail-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+    .detail-field-label {
+      font-family: var(--font-sans);
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--color-ink-3);
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+    .detail-select,
+    .detail-summary-input {
+      width: 100%;
+      min-width: 0;
+      height: 26px;
+      border: 1px solid var(--color-rule-light);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface);
+      color: var(--color-ink);
+      font-family: var(--font-sans);
+      font-size: 11px;
+      padding: 0 7px;
+      outline: none;
+    }
+    .detail-summary-input::placeholder { color: var(--color-ink-3); }
+    .detail-select:focus,
+    .detail-summary-input:focus { border-color: var(--color-accent); }
+
     .detail-body {
       padding: var(--space-md);
       flex: 1;
@@ -385,6 +532,55 @@
     }
     .detail-body-view strong { font-weight: 600; }
     .detail-body-view em { font-style: italic; }
+
+    .detail-links {
+      padding: 0 var(--space-md) var(--space-md);
+    }
+    .detail-links-label {
+      display: block;
+      margin-bottom: 5px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0;
+      color: var(--color-ink-4);
+    }
+    .detail-links-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .detail-link-item {
+      display: grid;
+      grid-template-columns: 100px minmax(0, 1fr);
+      gap: var(--space-sm);
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 7px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-rule-light);
+      color: var(--color-ink-2);
+      text-align: left;
+    }
+    .detail-link-item:hover { background: var(--color-chrome-mid); }
+    .detail-link-item[disabled] {
+      opacity: 0.55;
+    }
+    .detail-link-rel {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--color-ink-3);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .detail-link-title {
+      font-family: var(--font-sans);
+      font-size: 11px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
 
     .detail-textarea {
       display: block;
@@ -494,7 +690,13 @@
       margin-bottom: 4px;
     }
     .new-form-field { display: flex; flex-direction: column; }
+    .new-form-row {
+      display: grid;
+      grid-template-columns: 120px minmax(0, 1fr);
+      gap: var(--space-sm);
+    }
     .new-form-field input,
+    .new-form-field select,
     .new-form-field textarea {
       font-family: var(--font-sans);
       font-size: 13px;
@@ -550,7 +752,14 @@
 <div class="toolbar">
   <span class="toolbar-title">Knowledge Base</span>
   <div class="sort-toggle" id="sortToggle" title="Toggle sort order">Newest</div>
+  <div class="view-toggle" aria-label="View mode">
+    <button class="view-toggle-btn view-toggle-btn--active" id="viewList" type="button">List</button>
+    <button class="view-toggle-btn" id="viewGraph" type="button">Graph</button>
+  </div>
   <span class="toolbar-spacer"></span>
+  <select class="type-filter" id="typeFilter" title="Filter by type">
+    <option value="">All types</option>
+  </select>
   <div class="search-box">
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
     <input class="search-input" id="searchInput" type="search" placeholder="Search..." autocorrect="off" autocapitalize="off">
@@ -578,6 +787,22 @@
       <span class="detail-tags-label">Tags</span>
       <input class="detail-tags-input" id="detailTags" type="text" placeholder="comma-separated tags...">
     </div>
+    <div class="detail-meta-row">
+      <div class="detail-field">
+        <label class="detail-field-label" for="detailType">Type</label>
+        <select class="detail-select" id="detailType">
+          <option value="note">note</option>
+          <option value="person">person</option>
+          <option value="org">org</option>
+          <option value="project">project</option>
+          <option value="record">record</option>
+        </select>
+      </div>
+      <div class="detail-field">
+        <label class="detail-field-label" for="detailSummary">Summary</label>
+        <input class="detail-summary-input" id="detailSummary" type="text" maxlength="1000" placeholder="optional short retrieval summary...">
+      </div>
+    </div>
     <div class="detail-body" id="detailBody"></div>
     <div class="detail-footer">
       <span class="detail-date" id="detailDate"></span>
@@ -593,13 +818,29 @@
   <div class="new-form">
     <div class="new-form-header">New Knowledge Entry</div>
     <div class="new-form-body">
-      <div class="new-form-field">
-        <label class="new-form-label">Title</label>
-        <input type="text" id="newTitle" placeholder="Entry title...">
+      <div class="new-form-row">
+        <div class="new-form-field">
+          <label class="new-form-label">Type</label>
+          <select id="newType">
+            <option value="note">note</option>
+            <option value="person">person</option>
+            <option value="org">org</option>
+            <option value="project">project</option>
+            <option value="record">record</option>
+          </select>
+        </div>
+        <div class="new-form-field">
+          <label class="new-form-label">Title</label>
+          <input type="text" id="newTitle" placeholder="Entry title...">
+        </div>
       </div>
       <div class="new-form-field">
         <label class="new-form-label">Tags</label>
         <input type="text" id="newTags" placeholder="comma-separated tags...">
+      </div>
+      <div class="new-form-field">
+        <label class="new-form-label">Summary</label>
+        <input type="text" id="newSummary" maxlength="1000" placeholder="optional, concise retrieval hint...">
       </div>
       <div class="new-form-field">
         <label class="new-form-label">Content</label>
@@ -620,10 +861,12 @@ import { runtime } from '/sdk/mim.js'
 
 // ── State ──
 
-let entries = []        // { id, title, tags, created, updated, body? }
+let entries = []        // { id, title, type, summary, tags, links, extra, created, updated, body? }
 let folderPresent = true
 let searchQuery = ''
 let activeTag = ''
+let activeType = ''
+let viewMode = 'list'
 let sortMode = 'date'   // 'date' | 'alpha'
 let openDetailId = null
 let editMode = false
@@ -635,21 +878,34 @@ function normEntry(raw) {
   return {
     id: raw.id,
     title: raw.title || '',
+    type: raw.type || 'note',
+    summary: raw.summary || '',
     tags: Array.isArray(raw.tags) ? raw.tags : [],
+    links: Array.isArray(raw.links) ? raw.links.map(normLink).filter(Boolean) : [],
+    extra: raw.extra && typeof raw.extra === 'object' && !Array.isArray(raw.extra) ? raw.extra : {},
     created: raw.created || '',
     updated: raw.updated || '',
     body: typeof raw.body === 'string' ? raw.body : undefined,
   }
 }
 
+function normLink(link) {
+  if (link && typeof link === 'object' && typeof link.rel === 'string' && typeof link.target === 'string') {
+    return { rel: link.rel, target: link.target }
+  }
+  const parts = String(link || '').trim().split(/\s+/, 2)
+  if (parts.length < 2) return null
+  return { rel: parts[0], target: parts[1] }
+}
+
 // ── Simple Markdown renderer ──
 
 function renderMarkdown(md) {
-  if (!md) return '<p style="color:var(--color-ink-3);font-style:italic;">No content.</p>'
-  let html = md
+  if (!md) return '<p class="empty-content">No content.</p>'
+  let html = escapeHtml(md)
     // Code blocks
     .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
-      `<pre><code>${escapeHtml(code.trimEnd())}</code></pre>`)
+      `<pre><code>${code.trimEnd()}</code></pre>`)
     // Inline code
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     // Headings
@@ -663,7 +919,7 @@ function renderMarkdown(md) {
     // Blockquotes
     .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
     // Links
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => `<a href="${escapeAttr(href)}" target="_blank">${label}</a>`)
     // Unordered lists
     .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
     // Ordered lists
@@ -686,7 +942,11 @@ function renderMarkdown(md) {
 }
 
 function escapeHtml(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function escapeAttr(s) {
+  return escapeHtml(s).replace(/"/g, '&quot;')
 }
 
 // ── Data access (core tools via runtime SDK) ──
@@ -701,7 +961,11 @@ async function saveEntry(entry) {
   const result = await runtime.call('knowledge.update', {
     id: entry.id,
     title: entry.title,
+    type: entry.type || 'note',
+    summary: entry.summary || '',
     tags: entry.tags,
+    links: (entry.links || []).map(link => `${link.rel} ${link.target}`),
+    extra: entry.extra || {},
     body: entry.body || '',
   })
   if (result && result.folderPresent === false) { folderPresent = false; return }
@@ -713,9 +977,11 @@ async function saveEntry(entry) {
   }
 }
 
-async function createEntry(title, tags, body) {
+async function createEntry(title, type, summary, tags, body) {
   const result = await runtime.call('knowledge.create', {
     title,
+    type,
+    summary,
     tags: tags.split(',').map(t => t.trim()).filter(Boolean),
     body,
   })
@@ -738,6 +1004,7 @@ async function ensureBody(entry) {
   if (typeof entry.body === 'string') return entry.body
   try {
     const full = await runtime.call('knowledge.get', { id: entry.id })
+    Object.assign(entry, normEntry(full))
     entry.body = typeof full.body === 'string' ? full.body : ''
   } catch {
     entry.body = ''
@@ -753,8 +1020,18 @@ function getAllTags() {
   return [...set].sort()
 }
 
+function getAllTypes() {
+  const set = new Set()
+  entries.forEach(e => set.add(e.type || 'note'))
+  return [...set].sort()
+}
+
 function getFilteredEntries() {
-  let result = entries
+  let result = [...entries]
+
+  if (activeType) {
+    result = result.filter(e => (e.type || 'note') === activeType)
+  }
 
   // Tag filter
   if (activeTag) {
@@ -765,7 +1042,10 @@ function getFilteredEntries() {
   if (searchQuery) {
     const q = searchQuery.toLowerCase()
     result = result.filter(e =>
+      (e.id || '').toLowerCase().includes(q) ||
       (e.title || '').toLowerCase().includes(q) ||
+      (e.type || '').toLowerCase().includes(q) ||
+      (e.summary || '').toLowerCase().includes(q) ||
       (e.tags || []).some(t => t.toLowerCase().includes(q)) ||
       (e.body || '').toLowerCase().includes(q)
     )
@@ -787,6 +1067,9 @@ const contentEl = document.getElementById('content')
 const tagBarEl = document.getElementById('tagBar')
 const loadingEl = document.getElementById('loadingMsg')
 const sortToggleEl = document.getElementById('sortToggle')
+const typeFilterEl = document.getElementById('typeFilter')
+const viewListEl = document.getElementById('viewList')
+const viewGraphEl = document.getElementById('viewGraph')
 
 function render() {
   if (!folderPresent) {
@@ -795,7 +1078,10 @@ function render() {
     return
   }
   renderTagBar()
-  renderCards()
+  renderTypeFilter()
+  renderViewToggle()
+  if (viewMode === 'graph') renderGraph()
+  else renderCards()
   sortToggleEl.textContent = sortMode === 'date' ? 'Newest' : 'A-Z'
 }
 
@@ -849,6 +1135,20 @@ function renderTagBar() {
   })
 }
 
+function renderTypeFilter() {
+  const types = getAllTypes()
+  const options = ['<option value="">All types</option>']
+  for (const type of types) {
+    options.push(`<option value="${escapeHtml(type)}" ${activeType === type ? 'selected' : ''}>${escapeHtml(type)}</option>`)
+  }
+  typeFilterEl.innerHTML = options.join('')
+}
+
+function renderViewToggle() {
+  viewListEl.classList.toggle('view-toggle-btn--active', viewMode === 'list')
+  viewGraphEl.classList.toggle('view-toggle-btn--active', viewMode === 'graph')
+}
+
 function renderCards() {
   const filtered = getFilteredEntries()
 
@@ -856,11 +1156,11 @@ function renderCards() {
     contentEl.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">📚</div>
-        <div class="empty-title">${searchQuery || activeTag ? 'No matching entries' : 'No knowledge entries yet'}</div>
-        <div class="empty-sub">${searchQuery || activeTag
+        <div class="empty-title">${searchQuery || activeTag || activeType ? 'No matching entries' : 'No knowledge entries yet'}</div>
+        <div class="empty-sub">${searchQuery || activeTag || activeType
           ? 'Try different search terms or clear the filter.'
           : 'Create your first entry to start building your knowledge base.'}</div>
-        ${!searchQuery && !activeTag ? '<button class="empty-btn" id="emptyNewBtn">+ New Entry</button>' : ''}
+        ${!searchQuery && !activeTag && !activeType ? '<button class="empty-btn" id="emptyNewBtn">+ New Entry</button>' : ''}
       </div>
     `
     const emptyBtn = document.getElementById('emptyNewBtn')
@@ -878,14 +1178,18 @@ function renderCards() {
 }
 
 function renderCardHTML(entry) {
-  const excerpt = (entry.body || '').replace(/^#+\s+/gm, '').replace(/[*_`#>\-]/g, '').trim().slice(0, 100)
+  const excerpt = entry.summary || (entry.body || '').replace(/^#+\s+/gm, '').replace(/[*_`#>\-]/g, '').trim().slice(0, 100)
   const date = formatDate(entry.updated || entry.created)
   const tagsHtml = (entry.tags || []).slice(0, 4).map(t =>
     `<span class="card-tag">${escapeHtml(t)}</span>`
   ).join('')
+  const typeLabel = entry.type && entry.type !== 'note'
+    ? `<div class="card-type">${escapeHtml(entry.type)}</div>`
+    : ''
 
   return `
     <div class="card" data-id="${entry.id}">
+      ${typeLabel}
       <div class="card-title">${escapeHtml(entry.title || '(untitled)')}</div>
       ${tagsHtml ? `<div class="card-tags">${tagsHtml}</div>` : ''}
       ${excerpt ? `<div class="card-excerpt">${escapeHtml(excerpt)}</div>` : ''}
@@ -894,12 +1198,185 @@ function renderCardHTML(entry) {
   `
 }
 
+function renderGraph() {
+  const filtered = getFilteredEntries()
+  if (filtered.length === 0) {
+    contentEl.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">Graph</div>
+        <div class="empty-title">No graph nodes</div>
+        <div class="empty-sub">Try different search terms or clear the filter.</div>
+      </div>
+    `
+    return
+  }
+
+  const graph = buildGraph(filtered)
+  contentEl.innerHTML = `
+    <div class="graph-shell">
+      <div class="graph-meta">${graph.nodes.length} nodes / ${graph.edges.length} links</div>
+      <div class="graph-canvas">
+        ${renderGraphSvg(graph)}
+      </div>
+    </div>
+  `
+
+  contentEl.querySelectorAll('.graph-node').forEach(node => {
+    node.addEventListener('click', () => {
+      const id = node.dataset.id
+      if (id && entries.some(entry => entry.id === id)) openDetail(id)
+    })
+  })
+}
+
+function buildGraph(sourceEntries) {
+  const nodesById = new Map(sourceEntries.map(entry => [entry.id, {
+    id: entry.id,
+    title: entry.title || entry.id,
+    type: entry.type || 'note',
+    missing: false,
+  }]))
+  const visibleIds = new Set(nodesById.keys())
+  const edges = []
+
+  for (const entry of sourceEntries) {
+    for (const link of entry.links || []) {
+      if (!visibleIds.has(link.target)) {
+        const target = entries.find(e => e.id === link.target)
+        if (!target) {
+          nodesById.set(link.target, { id: link.target, title: link.target, type: 'missing', missing: true })
+        } else if (!activeTag && !activeType && !searchQuery) {
+          nodesById.set(target.id, { id: target.id, title: target.title || target.id, type: target.type || 'note', missing: false })
+        }
+      }
+      if (nodesById.has(link.target)) edges.push({ source: entry.id, target: link.target, rel: link.rel, missing: !entries.some(e => e.id === link.target) })
+    }
+  }
+
+  const nodes = [...nodesById.values()]
+  layoutGraph(nodes, edges)
+  return { nodes, edges }
+}
+
+function layoutGraph(nodes, edges) {
+  const width = Math.max(contentEl.clientWidth - 32, 640)
+  const height = Math.max(contentEl.clientHeight - 90, 520)
+  const types = [...new Set(nodes.map(node => node.type))].sort()
+  const typeIndex = new Map(types.map((type, index) => [type, index]))
+  const radius = Math.min(width, height) * 0.32
+  const cx = width / 2
+  const cy = height / 2
+
+  nodes.forEach((node, index) => {
+    const typeAngle = ((typeIndex.get(node.type) || 0) / Math.max(types.length, 1)) * Math.PI * 2 - Math.PI / 2
+    const jitter = (index / Math.max(nodes.length, 1)) * Math.PI * 2
+    node.x = cx + Math.cos(typeAngle) * radius + Math.cos(jitter) * 35
+    node.y = cy + Math.sin(typeAngle) * radius + Math.sin(jitter) * 35
+    node.vx = 0
+    node.vy = 0
+  })
+
+  const nodeMap = new Map(nodes.map(node => [node.id, node]))
+  for (let step = 0; step < 120; step++) {
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i]
+        const b = nodes[j]
+        let dx = b.x - a.x
+        let dy = b.y - a.y
+        let d2 = dx * dx + dy * dy
+        if (d2 < 1) { dx = 1; dy = 0; d2 = 1 }
+        const force = 520 / d2
+        a.vx -= dx * force
+        a.vy -= dy * force
+        b.vx += dx * force
+        b.vy += dy * force
+      }
+    }
+
+    for (const edge of edges) {
+      const source = nodeMap.get(edge.source)
+      const target = nodeMap.get(edge.target)
+      if (!source || !target) continue
+      const dx = target.x - source.x
+      const dy = target.y - source.y
+      const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1)
+      const force = (dist - 135) * 0.012
+      const fx = dx / dist * force
+      const fy = dy / dist * force
+      source.vx += fx
+      source.vy += fy
+      target.vx -= fx
+      target.vy -= fy
+    }
+
+    for (const node of nodes) {
+      const typeAngle = ((typeIndex.get(node.type) || 0) / Math.max(types.length, 1)) * Math.PI * 2 - Math.PI / 2
+      const tx = cx + Math.cos(typeAngle) * radius
+      const ty = cy + Math.sin(typeAngle) * radius
+      node.vx += (tx - node.x) * 0.006
+      node.vy += (ty - node.y) * 0.006
+      node.x = clamp(node.x + node.vx, 70, width - 90)
+      node.y = clamp(node.y + node.vy, 45, height - 45)
+      node.vx *= 0.82
+      node.vy *= 0.82
+    }
+  }
+
+  nodes.width = width
+  nodes.height = height
+}
+
+function renderGraphSvg(graph) {
+  const width = graph.nodes.width || 800
+  const height = graph.nodes.height || 520
+  const nodeMap = new Map(graph.nodes.map(node => [node.id, node]))
+  const edges = graph.edges.map(edge => {
+    const source = nodeMap.get(edge.source)
+    const target = nodeMap.get(edge.target)
+    if (!source || !target) return ''
+    return `<line class="graph-edge ${edge.missing ? 'graph-edge--missing' : ''}" x1="${source.x.toFixed(1)}" y1="${source.y.toFixed(1)}" x2="${target.x.toFixed(1)}" y2="${target.y.toFixed(1)}"><title>${escapeHtml(edge.rel)}</title></line>`
+  }).join('')
+  const nodes = graph.nodes.map(node => `
+    <g class="graph-node" data-id="${escapeHtml(node.id)}" transform="translate(${node.x.toFixed(1)} ${node.y.toFixed(1)})">
+      <circle r="${node.missing ? 6 : 8}" fill="${graphColor(node.type)}"></circle>
+      <text x="12" y="-1">${escapeHtml(shortLabel(node.title, 28))}</text>
+      <text class="graph-node-type" x="12" y="11">${escapeHtml(node.type)}</text>
+      <title>${escapeHtml(node.id)}</title>
+    </g>
+  `).join('')
+  return `<svg class="graph-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Knowledge graph">${edges}${nodes}</svg>`
+}
+
+function graphColor(type) {
+  const palette = {
+    person: 'var(--color-accent)',
+    org: 'var(--color-ink-2)',
+    project: 'var(--color-ink)',
+    record: 'var(--color-rem)',
+    missing: 'var(--color-ink-4)',
+    note: 'var(--color-ink-3)',
+  }
+  return palette[type] || 'var(--color-ink-3)'
+}
+
+function shortLabel(value, max) {
+  const text = String(value || '')
+  return text.length > max ? text.slice(0, max - 3) + '...' : text
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value))
+}
+
 // ── Detail View ──
 
 const overlayEl = document.getElementById('overlay')
 const detailEl = document.getElementById('detail')
 const detailTitleEl = document.getElementById('detailTitle')
 const detailTagsEl = document.getElementById('detailTags')
+const detailTypeEl = document.getElementById('detailType')
+const detailSummaryEl = document.getElementById('detailSummary')
 const detailBodyEl = document.getElementById('detailBody')
 const detailDateEl = document.getElementById('detailDate')
 const detailEditBtn = document.getElementById('detailEditBtn')
@@ -913,6 +1390,8 @@ async function openDetail(id) {
   editMode = false
   detailTitleEl.value = entry.title || ''
   detailTagsEl.value = (entry.tags || []).join(', ')
+  detailTypeEl.value = entry.type || 'note'
+  detailSummaryEl.value = entry.summary || ''
   renderDetailBody(entry)
   detailDateEl.textContent = entry.created ? 'Created ' + formatDate(entry.created) : ''
   detailEditBtn.textContent = 'Edit'
@@ -921,6 +1400,8 @@ async function openDetail(id) {
   detailTitleEl.focus()
   // Body is omitted from list items; fetch it lazily then re-render the view.
   await ensureBody(entry)
+  detailTypeEl.value = entry.type || 'note'
+  detailSummaryEl.value = entry.summary || ''
   if (openDetailId === id && !editMode) renderDetailBody(entry)
 }
 
@@ -928,8 +1409,42 @@ function renderDetailBody(entry) {
   if (editMode) {
     detailBodyEl.innerHTML = `<textarea class="detail-textarea" id="detailTextarea" placeholder="Write markdown...">${escapeHtml(entry.body || '')}</textarea>`
   } else {
-    detailBodyEl.innerHTML = `<div class="detail-body-view">${renderMarkdown(entry.body)}</div>`
+    detailBodyEl.innerHTML = `
+      <div class="detail-body-view">${renderMarkdown(entry.body)}</div>
+      ${renderDetailLinks(entry)}
+    `
+    bindDetailLinks()
   }
+}
+
+function renderDetailLinks(entry) {
+  const links = entry.links || []
+  if (links.length === 0) return ''
+  const items = links.map(link => {
+    const target = entries.find(e => e.id === link.target)
+    const title = target ? (target.title || target.id) : `${link.target} (missing)`
+    return `
+      <button class="detail-link-item" data-id="${escapeHtml(link.target)}" ${target ? '' : 'disabled'}>
+        <span class="detail-link-rel">${escapeHtml(link.rel)}</span>
+        <span class="detail-link-title">${escapeHtml(title)}</span>
+      </button>
+    `
+  }).join('')
+  return `
+    <div class="detail-links">
+      <span class="detail-links-label">Links</span>
+      <div class="detail-links-list">${items}</div>
+    </div>
+  `
+}
+
+function bindDetailLinks() {
+  detailBodyEl.querySelectorAll('.detail-link-item').forEach(button => {
+    button.addEventListener('click', () => {
+      const id = button.dataset.id
+      if (id) openDetail(id)
+    })
+  })
 }
 
 function closeDetail() {
@@ -944,6 +1459,8 @@ function saveDetailChanges() {
   const entry = entries.find(e => e.id === openDetailId)
   if (!entry) return
   entry.title = detailTitleEl.value.trim() || entry.title
+  entry.type = detailTypeEl.value || 'note'
+  entry.summary = detailSummaryEl.value.trim()
   entry.tags = detailTagsEl.value.split(',').map(t => t.trim()).filter(Boolean)
   if (editMode) {
     const textarea = document.getElementById('detailTextarea')
@@ -1003,18 +1520,28 @@ detailTitleEl.addEventListener('blur', () => {
 detailTagsEl.addEventListener('blur', () => {
   if (openDetailId) saveDetailChanges()
 })
+detailTypeEl.addEventListener('change', () => {
+  if (openDetailId) saveDetailChanges()
+})
+detailSummaryEl.addEventListener('blur', () => {
+  if (openDetailId) saveDetailChanges()
+})
 
 // ── New Entry Form ──
 
 const newOverlayEl = document.getElementById('newOverlay')
+const newTypeEl = document.getElementById('newType')
 const newTitleEl = document.getElementById('newTitle')
 const newTagsEl = document.getElementById('newTags')
+const newSummaryEl = document.getElementById('newSummary')
 const newBodyEl = document.getElementById('newBody')
 
 function openNewForm() {
   showNewForm = true
+  newTypeEl.value = activeType || 'note'
   newTitleEl.value = ''
   newTagsEl.value = ''
+  newSummaryEl.value = ''
   newBodyEl.value = ''
   newOverlayEl.style.display = 'flex'
   requestAnimationFrame(() => newTitleEl.focus())
@@ -1032,7 +1559,7 @@ document.getElementById('newCancel').addEventListener('click', closeNewForm)
 document.getElementById('newSave').addEventListener('click', async () => {
   const title = newTitleEl.value.trim()
   if (!title) { newTitleEl.focus(); return }
-  const entry = await createEntry(title, newTagsEl.value, newBodyEl.value)
+  const entry = await createEntry(title, newTypeEl.value || 'note', newSummaryEl.value.trim(), newTagsEl.value, newBodyEl.value)
   closeNewForm()
   render()
   if (entry) openDetail(entry.id)
@@ -1054,6 +1581,21 @@ newTitleEl.addEventListener('keydown', (e) => {
 
 sortToggleEl.addEventListener('click', () => {
   sortMode = sortMode === 'date' ? 'alpha' : 'date'
+  render()
+})
+
+viewListEl.addEventListener('click', () => {
+  viewMode = 'list'
+  render()
+})
+
+viewGraphEl.addEventListener('click', () => {
+  viewMode = 'graph'
+  render()
+})
+
+typeFilterEl.addEventListener('change', (e) => {
+  activeType = e.target.value
   render()
 })
 
@@ -1114,6 +1656,7 @@ async function init() {
 runtime.on('workspace:changed', async () => {
   entries = []
   activeTag = ''
+  activeType = ''
   searchQuery = ''
   openDetailId = null
   overlayEl.style.display = 'none'
