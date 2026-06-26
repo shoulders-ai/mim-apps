@@ -89,6 +89,27 @@ describe('knowledge package model', () => {
     expect(parseKnowledge(entry.id, serializeKnowledge(entry))).toEqual(entry)
   })
 
+  it('serializes string-coerced tag and link lists', () => {
+    const entry = parseKnowledge('coerced', serializeKnowledge({
+      id: 'coerced',
+      title: 'Coerced',
+      type: 'note',
+      summary: '',
+      tags: '["ops","deploy"]',
+      links: 'references release-checklist, mentions jane-doe',
+      extra: {},
+      created: '2026-05-01T10:00:00.000Z',
+      updated: '2026-05-02T10:00:00.000Z',
+      body: '',
+    }))
+
+    expect(entry.tags).toEqual(['ops', 'deploy'])
+    expect(entry.links).toEqual([
+      { rel: 'references', target: 'release-checklist' },
+      { rel: 'mentions', target: 'jane-doe' },
+    ])
+  })
+
   it('tolerates missing frontmatter and csv/list tags', () => {
     expect(parseKnowledge('just-body', 'just body')).toMatchObject({ type: 'note', body: 'just body' })
     expect(parseKnowledge('tagged', '---\ntitle: T\ntags: ops, deploy, q2\n---\nb').tags)
@@ -183,6 +204,40 @@ describe('knowledge package tools', () => {
     const deleted = await deleteKnowledge(ctx, { id: created.id })
     expect(deleted).toEqual({ ok: true })
     expect(ctx.files.has(`knowledge/${created.id}.md`)).toBe(false)
+  })
+
+  it('accepts string-coerced tag and link arrays on create and update', async () => {
+    const ctx = createCtx({ 'knowledge/.keep': '' })
+    const created = await createKnowledge(ctx, {
+      title: 'String Coerced',
+      tags: '["ops","deploy"]',
+      links: '["references fde-three-views","mentions jane-doe"]',
+    })
+
+    expect(created.tags).toEqual(['ops', 'deploy'])
+    expect(created.links).toEqual([
+      { rel: 'references', target: 'fde-three-views' },
+      { rel: 'mentions', target: 'jane-doe' },
+    ])
+
+    const updated = await updateKnowledge(ctx, {
+      id: created.id,
+      tags: 'ops, release',
+      links: 'references release-checklist, mentions jane-doe',
+    })
+
+    expect(updated.tags).toEqual(['ops', 'release'])
+    expect(updated.links).toEqual([
+      { rel: 'references', target: 'release-checklist' },
+      { rel: 'mentions', target: 'jane-doe' },
+    ])
+
+    const got = await getKnowledge(ctx, { id: created.id })
+    expect(got.tags).toEqual(['ops', 'release'])
+    expect(got.links).toEqual([
+      { rel: 'references', target: 'release-checklist' },
+      { rel: 'mentions', target: 'jane-doe' },
+    ])
   })
 
   it('allocates readable slug ids and suffixes collisions', async () => {

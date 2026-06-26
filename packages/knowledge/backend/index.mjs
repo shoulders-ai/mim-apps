@@ -137,17 +137,29 @@ function compactErrorText(value, maxChars = 180) {
   return `${text.slice(0, maxChars - 3).trimEnd()}...`
 }
 
+function coerceStringList(value, separator = /[,\n]/) {
+  const text = String(value ?? '').trim()
+  if (!text) return []
+  const parsed = parseScalar(text)
+  if (Array.isArray(parsed)) return parsed
+  return text.split(separator).map(item => item.trim()).filter(Boolean)
+}
+
 function coerceTags(value) {
-  if (Array.isArray(value)) return value.map(String)
+  if (Array.isArray(value)) return value.map(String).map(tag => tag.trim()).filter(Boolean)
   if (typeof value === 'string') {
-    return value.split(',').map(t => t.trim()).filter(Boolean)
+    return coerceStringList(value).map(String).map(tag => tag.trim()).filter(Boolean)
   }
   return []
 }
 
 function coerceLinks(value) {
-  if (!Array.isArray(value)) return []
-  return value
+  const items = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? coerceStringList(value)
+      : []
+  return items
     .map(link => {
       if (link && typeof link === 'object' && typeof link.rel === 'string' && typeof link.target === 'string') {
         return { rel: link.rel.trim(), target: link.target.trim() }
@@ -235,9 +247,10 @@ export function serializeKnowledge(entry) {
   lines.push(`type: ${yamlScalar(normalizeType(entry.type))}`)
   const summary = normalizeSummary(entry.summary)
   if (summary) lines.push(`summary: ${yamlScalar(summary)}`)
-  if (Array.isArray(entry.tags) && entry.tags.length > 0) {
+  const tags = coerceTags(entry.tags)
+  if (tags.length > 0) {
     lines.push('tags:')
-    for (const tag of entry.tags) lines.push(`  - ${yamlScalar(tag)}`)
+    for (const tag of tags) lines.push(`  - ${yamlScalar(tag)}`)
   }
   const links = coerceLinks(entry.links)
   if (links.length > 0) {
@@ -326,7 +339,7 @@ export async function createKnowledge(ctx, input = {}) {
     title: input.title,
     type: normalizeType(input.type),
     summary: normalizeSummary(input.summary),
-    tags: Array.isArray(input.tags) ? input.tags : [],
+    tags: coerceTags(input.tags),
     links: coerceLinks(input.links),
     extra: { ...coerceExtra(input.extra), ...entryExtra(input) },
     created: timestamp,
@@ -372,6 +385,7 @@ export async function updateKnowledge(ctx, input = {}) {
     ...patch,
     type: Object.hasOwn(patch, 'type') ? normalizeType(patch.type) : existing.type,
     summary: Object.hasOwn(patch, 'summary') ? normalizeSummary(patch.summary) : existing.summary,
+    tags: Object.hasOwn(patch, 'tags') ? coerceTags(patch.tags) : existing.tags,
     links: Object.hasOwn(patch, 'links') ? coerceLinks(patch.links) : existing.links,
     extra: { ...existing.extra, ...patchExtra },
     id: existing.id,

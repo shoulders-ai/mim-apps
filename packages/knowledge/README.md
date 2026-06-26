@@ -22,6 +22,8 @@ Body content.
 
 `type` defaults to `note`. `summary` is optional; keep it short when present. `links` are directed graph edges in `"relation target-id"` form.
 
+Tool calls should send `tags` and `links` as arrays; `knowledge.create` and `knowledge.update` also normalize JSON-stringified or comma-separated list strings from AI tool callers.
+
 The app also maintains a disposable derived SQLite index at `.mim/knowledge.sqlite` for search and graph queries. Markdown remains the source of truth.
 
 The app ships the `package:knowledge/knowledge` skill so chat agents use catalog-first retrieval, read bodies only after narrowing candidates, traverse links with `knowledge.neighbors`, and handle sensitive records conservatively.
