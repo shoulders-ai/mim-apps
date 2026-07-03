@@ -5,6 +5,16 @@
   <link rel="stylesheet" href="/sdk/tokens.css">
   <title>Knowledge</title>
   <style>
+    /* ── Type Colors ── */
+    :root {
+      --type-person:  #2e8b7a;
+      --type-org:     #c49520;
+      --type-project: #4a8bc2;
+      --type-record:  #9c5bb5;
+      --type-note:    var(--color-ink-3);
+      --type-missing: var(--color-ink-4);
+    }
+
     /* ── Layout ── */
     html, body { height: 100%; overflow: hidden; }
     body { display: flex; flex-direction: column; }
@@ -21,6 +31,11 @@
       font-size: 12px;
       font-weight: 600;
       color: var(--color-ink-2);
+    }
+    .entry-count {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--color-ink-3);
     }
     .toolbar-spacer { flex: 1; }
     .search-box {
@@ -78,6 +93,7 @@
     .tag-chip {
       display: inline-flex;
       align-items: center;
+      gap: 3px;
       height: 20px;
       padding: 0 7px;
       border-radius: 100px;
@@ -93,8 +109,130 @@
       background: var(--color-accent-soft);
       color: var(--color-accent);
     }
+    .tag-count {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--color-ink-4);
+    }
+    .tag-chip--active .tag-count { color: var(--color-accent); opacity: 0.6; }
+    .tag-overflow-btn {
+      display: inline-flex;
+      align-items: center;
+      height: 20px;
+      padding: 0 7px;
+      border-radius: 100px;
+      background: var(--color-chrome-mid);
+      font-family: var(--font-sans);
+      font-size: 10px;
+      color: var(--color-ink-3);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .tag-overflow-btn:hover { background: var(--color-chrome); }
+    .tag-overflow-panel {
+      position: fixed;
+      z-index: 90;
+      background: var(--color-surface);
+      border: 1px solid var(--color-rule);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+      padding: var(--space-sm);
+      max-height: 300px;
+      width: 280px;
+      overflow-y: auto;
+      display: none;
+    }
+    .tag-overflow-search {
+      width: 100%;
+      height: 26px;
+      margin-bottom: var(--space-xs);
+      font-size: 11px;
+    }
+    .tag-overflow-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
 
-    /* ── Sort Toggle ── */
+    /* ── Tag Editor (component) ── */
+    .tag-editor {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+      min-height: 28px;
+      padding: 3px 6px;
+      border: 1px solid var(--color-rule-light);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface);
+      position: relative;
+    }
+    .tag-editor:focus-within { border-color: var(--color-accent); }
+    .tag-chip-edit {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      height: 20px;
+      padding: 0 4px 0 7px;
+      border-radius: 100px;
+      background: var(--color-accent-soft);
+      font-family: var(--font-sans);
+      font-size: 10px;
+      color: var(--color-accent);
+      white-space: nowrap;
+    }
+    .tag-chip-x {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      font-size: 11px;
+      line-height: 1;
+      color: var(--color-accent);
+      opacity: 0.5;
+    }
+    .tag-chip-x:hover { opacity: 1; background: rgba(0,0,0,0.06); }
+    .tag-editor-input {
+      flex: 1;
+      min-width: 60px;
+      border: none !important;
+      outline: none;
+      background: transparent;
+      font-family: var(--font-sans);
+      font-size: 11px;
+      color: var(--color-ink);
+      padding: 0 2px;
+      height: 20px;
+    }
+    .tag-editor-input::placeholder { color: var(--color-ink-3); }
+    .tag-suggest-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 50;
+      margin-top: 2px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-rule);
+      border-radius: var(--radius-sm);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      max-height: 160px;
+      overflow-y: auto;
+    }
+    .tag-suggest-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 4px 8px;
+      font-family: var(--font-sans);
+      font-size: 11px;
+      color: var(--color-ink);
+    }
+    .tag-suggest-item:hover { background: var(--color-chrome-mid); }
+
+    /* ── Sort & View Toggle ── */
     .sort-toggle {
       font-family: var(--font-sans);
       font-size: 10px;
@@ -162,12 +300,24 @@
       border: 1px solid var(--color-rule-light);
       border-radius: var(--radius-lg);
       padding: 12px;
+      padding-left: 14px;
+      border-left: 3px solid var(--color-rule-light);
       display: flex;
       flex-direction: column;
       cursor: default;
       transition: background 0.1s;
+      outline: none;
     }
     .card:hover { background: var(--color-chrome-high); }
+    .card:focus-visible {
+      box-shadow: 0 0 0 2px var(--color-accent);
+      border-color: var(--color-accent);
+    }
+    .card[data-type="person"]  { border-left-color: var(--type-person); }
+    .card[data-type="org"]     { border-left-color: var(--type-org); }
+    .card[data-type="project"] { border-left-color: var(--type-project); }
+    .card[data-type="record"]  { border-left-color: var(--type-record); }
+    .card[data-type="note"]    { border-left-color: var(--type-note); }
 
     .card-title {
       font-family: var(--font-sans);
@@ -214,13 +364,42 @@
       -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
     }
+    .card-footer {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: auto;
+      padding-top: 8px;
+    }
     .card-date {
       font-family: var(--font-mono);
       font-size: 9px;
       color: var(--color-ink-4);
-      margin-top: auto;
-      padding-top: 8px;
     }
+    .card-links {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--color-ink-4);
+      margin-left: auto;
+    }
+
+    /* ── Skeleton ── */
+    @keyframes shimmer {
+      0% { background-position: -200px 0; }
+      100% { background-position: 400px 0; }
+    }
+    .skeleton-line {
+      height: 10px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--color-chrome-mid) 0%, var(--color-chrome-high) 40%, var(--color-chrome-mid) 80%);
+      background-size: 400px 10px;
+      animation: shimmer 1.4s infinite linear;
+    }
+    .skeleton-line.w60 { width: 60%; }
+    .skeleton-line.w80 { width: 80%; }
+    .skeleton-line.w40 { width: 40%; }
+    .skeleton-line + .skeleton-line { margin-top: 8px; }
+    .card.skeleton { gap: 8px; pointer-events: none; min-height: 110px; }
 
     /* ── Empty State ── */
     .empty-state {
@@ -269,7 +448,7 @@
       margin-top: 10px;
       font-family: var(--font-sans);
       font-size: 11px;
-      color: var(--color-danger, #c0392b);
+      color: var(--color-rem);
       max-width: 240px;
       line-height: 1.5;
     }
@@ -300,25 +479,38 @@
       border-radius: var(--radius-lg);
       background: var(--color-surface);
       overflow: hidden;
+      position: relative;
     }
     .graph-svg {
       display: block;
       width: 100%;
       height: 100%;
       min-height: 520px;
+      touch-action: none;
     }
     .graph-edge {
       stroke: var(--color-rule);
       stroke-width: 1;
       opacity: 0.75;
+      transition: opacity 0.15s;
     }
     .graph-edge--missing {
       stroke-dasharray: 4 4;
       opacity: 0.45;
     }
+    .graph-edge-label {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      fill: var(--color-ink-4);
+      text-anchor: middle;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+    }
     .graph-node circle {
       stroke: var(--color-surface);
       stroke-width: 2;
+      transition: opacity 0.15s;
     }
     .graph-node:hover circle {
       stroke: var(--color-accent);
@@ -331,12 +523,44 @@
       stroke: var(--color-surface);
       stroke-width: 3px;
       stroke-linejoin: round;
+      pointer-events: none;
+      transition: opacity 0.15s;
     }
     .graph-node-type {
       font-family: var(--font-mono);
       font-size: 8px;
       text-transform: uppercase;
       fill: var(--color-ink-4);
+    }
+
+    /* Graph interaction states */
+    .graph-link.dim, .graph-node.dim { opacity: 0.12; }
+    .graph-link.hl .graph-edge { opacity: 1; stroke-width: 1.5; }
+    .graph-link.hl .graph-edge-label { opacity: 1; }
+    .graph-node.hl circle { stroke: var(--color-accent); stroke-width: 2.5; }
+
+    /* Graph legend */
+    .graph-legend {
+      position: absolute;
+      bottom: 8px;
+      left: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-family: var(--font-sans);
+      font-size: 9px;
+      color: var(--color-ink-3);
+    }
+    .graph-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .graph-legend-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
     }
 
     /* ── Loading ── */
@@ -378,6 +602,16 @@
       align-items: center;
       gap: var(--space-sm);
     }
+    .detail-title-text {
+      flex: 1;
+      font-family: var(--font-sans);
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--color-ink);
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .detail-title-input {
       display: block;
       flex: 1;
@@ -404,14 +638,19 @@
     }
     .detail-open-btn:hover { color: var(--color-ink-2); background: var(--color-chrome-mid); }
 
-    .detail-tags-row {
+    .detail-meta {
+      padding: var(--space-sm) var(--space-md);
+      border-bottom: 1px solid var(--color-rule-light);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+    .detail-meta-row {
       display: flex;
       align-items: center;
       gap: var(--space-sm);
-      padding: var(--space-sm) var(--space-md);
-      border-bottom: 1px solid var(--color-rule-light);
     }
-    .detail-tags-label {
+    .detail-meta-label {
       font-family: var(--font-sans);
       font-size: 10px;
       font-weight: 500;
@@ -419,43 +658,45 @@
       text-transform: uppercase;
       letter-spacing: 0.03em;
       flex-shrink: 0;
+      width: 56px;
     }
-    .detail-tags-input {
+    .detail-meta-value {
       flex: 1;
       min-width: 0;
-      background: transparent;
-      border: none;
-      outline: none;
       font-family: var(--font-sans);
       font-size: 11px;
       color: var(--color-ink);
-      padding: 0;
     }
-    .detail-tags-input::placeholder { color: var(--color-ink-3); }
-
-    .detail-meta-row {
-      display: grid;
-      grid-template-columns: 120px minmax(0, 1fr);
-      gap: var(--space-sm);
-      padding: var(--space-sm) var(--space-md);
-      border-bottom: 1px solid var(--color-rule-light);
-    }
-    .detail-field {
+    .detail-tags-view {
       display: flex;
-      flex-direction: column;
+      flex-wrap: wrap;
       gap: 4px;
-      min-width: 0;
     }
-    .detail-field-label {
+    .detail-tag-chip {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 100px;
+      background: var(--color-accent-soft);
       font-family: var(--font-sans);
       font-size: 10px;
-      font-weight: 500;
-      color: var(--color-ink-3);
-      text-transform: uppercase;
-      letter-spacing: 0;
+      color: var(--color-accent);
     }
-    .detail-select,
-    .detail-summary-input {
+    .detail-type-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+    .detail-summary-view {
+      font-family: var(--font-sans);
+      font-size: 11px;
+      color: var(--color-ink-2);
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+    .detail-select {
       width: 100%;
       min-width: 0;
       height: 26px;
@@ -468,9 +709,38 @@
       padding: 0 7px;
       outline: none;
     }
+    .detail-select:focus { border-color: var(--color-accent); }
+
+    /* Summary textarea + counter */
+    .summary-wrap { position: relative; }
+    .detail-summary-input {
+      width: 100%;
+      min-height: 26px;
+      max-height: 120px;
+      resize: none;
+      overflow: hidden;
+      border: 1px solid var(--color-rule-light);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface);
+      color: var(--color-ink);
+      font-family: var(--font-sans);
+      font-size: 11px;
+      padding: 4px 7px;
+      outline: none;
+      line-height: 1.4;
+    }
     .detail-summary-input::placeholder { color: var(--color-ink-3); }
-    .detail-select:focus,
     .detail-summary-input:focus { border-color: var(--color-accent); }
+    .summary-counter {
+      position: absolute;
+      bottom: 3px;
+      right: 6px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--color-ink-4);
+      pointer-events: none;
+    }
+    .summary-counter.warn { color: var(--color-rem); }
 
     .detail-body {
       padding: var(--space-md);
@@ -481,7 +751,7 @@
       font-size: 14px;
       line-height: 1.7;
       color: var(--color-ink);
-      min-height: 120px;
+      min-height: 80px;
       user-select: text;
       -webkit-user-select: text;
     }
@@ -501,6 +771,9 @@
       padding-left: 1.4em;
     }
     .detail-body-view li { margin-bottom: 0.2em; }
+    .detail-body-view li.task-check { list-style: none; margin-left: -1.4em; }
+    .detail-body-view li.task-check::before { content: '\2610 '; }
+    .detail-body-view li.task-check.checked::before { content: '\2611 '; }
     .detail-body-view code {
       font-family: var(--font-mono);
       font-size: 12px;
@@ -529,9 +802,56 @@
     .detail-body-view a {
       color: var(--color-accent);
       text-decoration: underline;
+      cursor: pointer;
     }
     .detail-body-view strong { font-weight: 600; }
     .detail-body-view em { font-style: italic; }
+    .detail-body-view hr {
+      border: none;
+      border-top: 1px solid var(--color-rule-light);
+      margin: 1em 0;
+    }
+    .detail-body-view table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 0.7em;
+      font-family: var(--font-sans);
+      font-size: 12px;
+    }
+    .detail-body-view th, .detail-body-view td {
+      padding: 4px 8px;
+      border: 1px solid var(--color-rule-light);
+      text-align: left;
+    }
+    .detail-body-view th {
+      background: var(--color-chrome-mid);
+      font-weight: 600;
+    }
+
+    .detail-body-skeleton {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 8px 0;
+    }
+
+    .detail-textarea {
+      display: block;
+      width: 100%;
+      min-height: 200px;
+      resize: vertical;
+      border: 1px solid var(--color-rule-light);
+      border-radius: var(--radius-sm);
+      padding: var(--space-sm);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--color-ink);
+      background: var(--color-surface);
+      outline: none;
+    }
+    .detail-textarea:focus { border-color: var(--color-accent); }
+    .detail-textarea::placeholder { color: var(--color-ink-3); }
 
     .detail-links {
       padding: 0 var(--space-md) var(--space-md);
@@ -563,9 +883,7 @@
       text-align: left;
     }
     .detail-link-item:hover { background: var(--color-chrome-mid); }
-    .detail-link-item[disabled] {
-      opacity: 0.55;
-    }
+    .detail-link-item[disabled] { opacity: 0.55; }
     .detail-link-rel {
       font-family: var(--font-mono);
       font-size: 9px;
@@ -582,24 +900,6 @@
       white-space: nowrap;
     }
 
-    .detail-textarea {
-      display: block;
-      width: 100%;
-      min-height: 200px;
-      resize: vertical;
-      border: 1px solid var(--color-rule-light);
-      border-radius: var(--radius-sm);
-      padding: var(--space-sm);
-      font-family: var(--font-mono);
-      font-size: 12px;
-      line-height: 1.6;
-      color: var(--color-ink);
-      background: var(--color-surface);
-      outline: none;
-    }
-    .detail-textarea:focus { border-color: var(--color-accent); }
-    .detail-textarea::placeholder { color: var(--color-ink-3); }
-
     .detail-footer {
       display: flex;
       align-items: center;
@@ -612,7 +912,9 @@
       color: var(--color-ink-4);
     }
     .detail-spacer { flex: 1; }
-    .detail-edit-btn {
+    .detail-edit-btn,
+    .detail-save-btn,
+    .detail-cancel-btn {
       display: inline-flex;
       align-items: center;
       gap: 4px;
@@ -624,28 +926,34 @@
       font-size: 11px;
       color: var(--color-ink-2);
     }
-    .detail-edit-btn:hover { background: var(--color-chrome-mid); }
-    .detail-edit-btn--active {
+    .detail-edit-btn:hover, .detail-cancel-btn:hover { background: var(--color-chrome-mid); }
+    .detail-save-btn {
       background: var(--color-accent);
       color: var(--color-accent-ink);
       border-color: var(--color-accent);
     }
-    .detail-edit-btn--active:hover { opacity: 0.9; background: var(--color-accent); }
+    .detail-save-btn:hover { opacity: 0.9; }
     .detail-delete-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 26px;
       height: 26px;
-      padding: 0;
+      padding: 0 8px;
       border-radius: var(--radius-sm);
       color: var(--color-ink-4);
+      font-family: var(--font-sans);
+      font-size: 11px;
       flex-shrink: 0;
     }
     .detail-delete-btn:hover {
       color: var(--color-rem);
       background: rgba(192, 93, 60, 0.08);
     }
+    .detail-delete-btn--armed {
+      background: var(--color-rem);
+      color: var(--color-accent-ink);
+    }
+    .detail-delete-btn--armed:hover { opacity: 0.9; background: var(--color-rem); }
 
     /* ── New Entry Form ── */
     .new-overlay {
@@ -737,21 +1045,65 @@
     }
     .new-form-save:hover { opacity: 0.9; }
 
+    /* ── Toast ── */
+    .toast-container {
+      position: fixed;
+      bottom: 32px;
+      right: 16px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: flex-end;
+    }
+    .toast {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: 8px 12px;
+      border-radius: var(--radius-md);
+      background: var(--color-ink);
+      color: var(--color-surface);
+      font-family: var(--font-sans);
+      font-size: 11px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      animation: toast-in 0.2s ease-out;
+    }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .toast-action {
+      font-weight: 600;
+      text-decoration: underline;
+      color: inherit;
+      opacity: 0.85;
+    }
+    .toast-action:hover { opacity: 1; }
+
     /* ── Kbd hint ── */
     .kbd-hint {
       position: fixed;
       bottom: 8px;
-      right: 12px;
+      left: 12px;
       font-family: var(--font-mono);
       font-size: 9px;
       color: var(--color-ink-4);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
     }
   </style>
 </head>
 <body>
 
 <div class="toolbar">
-  <span class="toolbar-title">Knowledge Base</span>
+  <span class="toolbar-title">Knowledge</span>
+  <span class="entry-count" id="entryCount"></span>
   <div class="sort-toggle" id="sortToggle" title="Toggle sort order">Newest</div>
   <div class="view-toggle" aria-label="View mode">
     <button class="view-toggle-btn view-toggle-btn--active" id="viewList" type="button">List</button>
@@ -774,49 +1126,10 @@
   <div class="loading" id="loadingMsg">Loading...</div>
 </div>
 
-<!-- Detail overlay -->
 <div class="overlay" id="overlay" style="display:none">
-  <div class="detail" id="detail">
-    <div class="detail-header">
-      <input class="detail-title-input" id="detailTitle" type="text" placeholder="Entry title...">
-      <button class="detail-open-btn" id="detailOpenBtn" title="Open in editor">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        Open
-      </button>
-      <button class="detail-delete-btn" id="detailDeleteBtn" title="Delete entry" aria-label="Delete entry">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>
-      </button>
-    </div>
-    <div class="detail-tags-row">
-      <span class="detail-tags-label">Tags</span>
-      <input class="detail-tags-input" id="detailTags" type="text" placeholder="comma-separated tags...">
-    </div>
-    <div class="detail-meta-row">
-      <div class="detail-field">
-        <label class="detail-field-label" for="detailType">Type</label>
-        <select class="detail-select" id="detailType">
-          <option value="note">note</option>
-          <option value="person">person</option>
-          <option value="org">org</option>
-          <option value="project">project</option>
-          <option value="record">record</option>
-        </select>
-      </div>
-      <div class="detail-field">
-        <label class="detail-field-label" for="detailSummary">Summary</label>
-        <input class="detail-summary-input" id="detailSummary" type="text" maxlength="1000" placeholder="optional short retrieval summary...">
-      </div>
-    </div>
-    <div class="detail-body" id="detailBody"></div>
-    <div class="detail-footer">
-      <span class="detail-date" id="detailDate"></span>
-      <span class="detail-spacer"></span>
-      <button class="detail-edit-btn" id="detailEditBtn">Edit</button>
-    </div>
-  </div>
+  <div class="detail" id="detail"></div>
 </div>
 
-<!-- New entry overlay -->
 <div class="new-overlay" id="newOverlay" style="display:none">
   <div class="new-form">
     <div class="new-form-header">New Knowledge Entry</div>
@@ -839,11 +1152,14 @@
       </div>
       <div class="new-form-field">
         <label class="new-form-label">Tags</label>
-        <input type="text" id="newTags" placeholder="comma-separated tags...">
+        <div class="tag-editor" id="newTagEditor"></div>
       </div>
       <div class="new-form-field">
         <label class="new-form-label">Summary</label>
-        <input type="text" id="newSummary" maxlength="1000" placeholder="optional, concise retrieval hint...">
+        <div class="summary-wrap">
+          <textarea id="newSummary" class="detail-summary-input" rows="2" maxlength="1000" placeholder="optional, concise retrieval hint..."></textarea>
+          <span class="summary-counter" id="newSummaryCounter"></span>
+        </div>
       </div>
       <div class="new-form-field">
         <label class="new-form-label">Content</label>
@@ -857,26 +1173,49 @@
   </div>
 </div>
 
-<div class="kbd-hint">/ search &middot; N new &middot; Esc close</div>
+<div class="toast-container" id="toastContainer"></div>
+<div class="kbd-hint">/ search &middot; N new &middot; J/K navigate &middot; Esc close</div>
 
 <script type="module">
 import { runtime } from '/sdk/mim.js'
 
 // ── State ──
 
-let entries = []        // { id, title, type, summary, tags, links, extra, created, updated, body? }
+let entries = []
 let folderPresent = true
 let searchQuery = ''
 let activeTag = ''
 let activeType = ''
 let viewMode = 'list'
-let sortMode = 'date'   // 'date' | 'alpha'
+let sortMode = 'date'
 let openDetailId = null
 let editMode = false
 let showNewForm = false
+let loadGen = 0
+let tagCorpus = []
+let deleteArmed = false
+let deleteArmTimer = null
 
-// Normalize a server entity (knowledge.list item or knowledge.get result) into
-// the flat shape the UI renders. `body` is present only after knowledge.get.
+// Search
+const SEARCH_DEBOUNCE_MS = 200
+let searchSeq = 0
+let searchTimer = null
+let searchResults = null
+
+// Graph
+let graphNodes = []
+let graphEdges = []
+let graphAdjacency = null
+let graphTransform = { x: 0, y: 0, scale: 1 }
+let graphAnimating = false
+let graphAnimFrames = 0
+let graphDragNode = null
+let graphPanStart = null
+let graphWidth = 800
+let graphHeight = 520
+
+// ── Entry normalization ──
+
 function normEntry(raw) {
   return {
     id: raw.id,
@@ -901,47 +1240,57 @@ function normLink(link) {
   return { rel: parts[0], target: parts[1] }
 }
 
-// ── Simple Markdown renderer ──
+// ── Markdown renderer ──
 
 function renderMarkdown(md) {
   if (!md) return '<p class="empty-content">No content.</p>'
   let html = escapeHtml(md)
-    // Code blocks
-    .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
-      `<pre><code>${code.trimEnd()}</code></pre>`)
-    // Inline code
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    // Headings
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    // Bold
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    // Italic
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // Blockquotes
-    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
-    // Links
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => `<a href="${escapeAttr(href)}" target="_blank">${label}</a>`)
-    // Unordered lists
-    .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
-    // Ordered lists
-    .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
 
-  // Wrap consecutive <li> in <ul>
-  html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>')
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
+    `<pre><code>${code.trimEnd()}</code></pre>`)
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>')
+  html = html.replace(/^---+\s*$/gm, '<hr>')
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>')
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>')
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>')
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
+  html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>')
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) =>
+    `<a href="${escapeAttr(href)}" target="_blank">${label}</a>`)
 
-  // Paragraphs: split by double newlines
+  html = html.replace(/^[-*] \[x\] (.+)$/gm, '<li class="task-check checked">$1</li>')
+  html = html.replace(/^[-*] \[ \] (.+)$/gm, '<li class="task-check">$1</li>')
+  html = html.replace(/^[-*] (.+)$/gm, '<li>$1</li>')
+  html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+  html = html.replace(/((?:<li[^>]*>.*<\/li>\n?)+)/g, '<ul>$1</ul>')
+
+  html = renderTables(html)
+
   html = html.split(/\n{2,}/).map(block => {
     block = block.trim()
     if (!block) return ''
     if (block.startsWith('<h') || block.startsWith('<pre') ||
         block.startsWith('<ul') || block.startsWith('<ol') ||
-        block.startsWith('<blockquote')) return block
+        block.startsWith('<blockquote') || block.startsWith('<table') ||
+        block.startsWith('<hr')) return block
     return `<p>${block.replace(/\n/g, '<br>')}</p>`
   }).join('\n')
 
   return html
+}
+
+function renderTables(html) {
+  return html.replace(/((?:^|\n)\|[^\n]+\|\s*\n\|[-:\s|]+\|\s*\n(?:\|[^\n]+\|\s*\n?)+)/g, (tableBlock) => {
+    const lines = tableBlock.trim().split('\n').filter(Boolean)
+    if (lines.length < 3) return tableBlock
+    const parseRow = (line) => line.replace(/^\||\|$/g, '').split('|').map(c => c.trim())
+    const headers = parseRow(lines[0])
+    const rows = lines.slice(2).map(parseRow)
+    return '<table><thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') +
+      '</tr></thead><tbody>' + rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('') +
+      '</tbody></table>'
+  })
 }
 
 function escapeHtml(s) {
@@ -952,36 +1301,68 @@ function escapeAttr(s) {
   return escapeHtml(s).replace(/"/g, '&quot;')
 }
 
-// ── Data access (core tools via runtime SDK) ──
+function formatDate(isoStr) {
+  try {
+    const d = new Date(isoStr)
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  } catch { return '' }
+}
 
-const LIST_PAGE_SIZE = 25
+function shortLabel(value, max) {
+  const text = String(value || '')
+  return text.length > max ? text.slice(0, max - 3) + '...' : text
+}
 
-async function loadEntries() {
-  const loaded = []
-  let offset = 0
-  let sawResult = false
+// ── Data access ──
 
-  while (offset !== null) {
-    const result = await runtime.call('knowledge.list', { limit: LIST_PAGE_SIZE, offset })
-    sawResult = true
+const FIRST_PAGE_SIZE = 50
+const PAGE_SIZE = 50
+
+async function loadFirstPage() {
+  const gen = ++loadGen
+  entries = []
+  searchResults = null
+  renderSkeleton()
+
+  try {
+    const result = await runtime.call('knowledge.list', { limit: FIRST_PAGE_SIZE, offset: 0 })
+    if (gen !== loadGen) return
     if (result && result.folderPresent === false) {
       folderPresent = false
-      entries = []
+      render()
       return
     }
-
-    const items = Array.isArray(result?.items) ? result.items : []
-    loaded.push(...items.map(normEntry))
+    folderPresent = true
+    entries = (result?.items || []).map(normEntry)
+    updateTagCorpus()
+    render()
 
     if (typeof result?.nextOffset === 'number') {
-      offset = result.nextOffset
-    } else {
+      loadRemainingPages(gen, result.nextOffset)
+    }
+  } catch (err) {
+    console.warn('[knowledge] load error:', err)
+    if (gen === loadGen) render()
+  }
+}
+
+async function loadRemainingPages(gen, startOffset) {
+  let offset = startOffset
+  while (offset !== null && gen === loadGen) {
+    try {
+      const result = await runtime.call('knowledge.list', { limit: PAGE_SIZE, offset })
+      if (gen !== loadGen) return
+      const items = (result?.items || []).map(normEntry)
+      entries.push(...items)
+      offset = typeof result?.nextOffset === 'number' ? result.nextOffset : null
+    } catch {
       offset = null
     }
   }
-
-  folderPresent = sawResult
-  entries = loaded
+  if (gen === loadGen) {
+    updateTagCorpus()
+    render()
+  }
 }
 
 async function saveEntry(entry) {
@@ -1009,24 +1390,23 @@ async function createEntry(title, type, summary, tags, body) {
     title,
     type,
     summary,
-    tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+    tags,
     body,
   })
   if (!result || result.folderPresent === false) { folderPresent = false; render(); return null }
   const entry = normEntry(result)
   if (entry.body === undefined) entry.body = body
   entries.push(entry)
+  updateTagCorpus()
   return entry
 }
 
 async function deleteEntry(id) {
-  const entry = entries.find(e => e.id === id)
-  if (!entry) return
   await runtime.call('knowledge.delete', { id })
   entries = entries.filter(e => e.id !== id)
+  updateTagCorpus()
 }
 
-// Lazily fetch the full body for an entry (list items omit it).
 async function ensureBody(entry) {
   if (typeof entry.body === 'string') return entry.body
   try {
@@ -1039,46 +1419,54 @@ async function ensureBody(entry) {
   return entry.body
 }
 
-// ── Filtering & Sorting ──
+// ── Tag computation ──
 
-function getAllTags() {
-  const set = new Set()
-  entries.forEach(e => (e.tags || []).forEach(t => set.add(t)))
-  return [...set].sort()
+function computeTagCounts() {
+  const counts = new Map()
+  entries.forEach(e => (e.tags || []).forEach(t => counts.set(t, (counts.get(t) || 0) + 1)))
+  return counts
 }
 
-function getAllTypes() {
+function computeTypeCounts() {
+  const counts = {}
+  entries.forEach(e => {
+    const t = e.type || 'note'
+    counts[t] = (counts[t] || 0) + 1
+  })
+  return counts
+}
+
+function updateTagCorpus() {
   const set = new Set()
-  entries.forEach(e => set.add(e.type || 'note'))
-  return [...set].sort()
+  entries.forEach(e => (e.tags || []).forEach(t => set.add(t)))
+  tagCorpus = [...set].sort()
+}
+
+// ── Filtering & sorting ──
+
+function clientMatch(entry, q) {
+  return (entry.id || '').toLowerCase().includes(q) ||
+    (entry.title || '').toLowerCase().includes(q) ||
+    (entry.type || '').toLowerCase().includes(q) ||
+    (entry.summary || '').toLowerCase().includes(q) ||
+    (entry.tags || []).some(t => t.toLowerCase().includes(q))
 }
 
 function getFilteredEntries() {
-  let result = [...entries]
+  let result = searchResults !== null ? [...searchResults] : [...entries]
+
+  if (searchResults === null && searchQuery) {
+    const q = searchQuery.toLowerCase()
+    result = result.filter(e => clientMatch(e, q))
+  }
 
   if (activeType) {
     result = result.filter(e => (e.type || 'note') === activeType)
   }
-
-  // Tag filter
   if (activeTag) {
     result = result.filter(e => (e.tags || []).includes(activeTag))
   }
 
-  // Search
-  if (searchQuery) {
-    const q = searchQuery.toLowerCase()
-    result = result.filter(e =>
-      (e.id || '').toLowerCase().includes(q) ||
-      (e.title || '').toLowerCase().includes(q) ||
-      (e.type || '').toLowerCase().includes(q) ||
-      (e.summary || '').toLowerCase().includes(q) ||
-      (e.tags || []).some(t => t.toLowerCase().includes(q)) ||
-      (e.body || '').toLowerCase().includes(q)
-    )
-  }
-
-  // Sort
   if (sortMode === 'date') {
     result.sort((a, b) => new Date(b.updated || b.created || 0) - new Date(a.updated || a.created || 0))
   } else {
@@ -1086,6 +1474,139 @@ function getFilteredEntries() {
   }
 
   return result
+}
+
+// ── Tag Editor Component ──
+
+function createTagEditor(container, opts = {}) {
+  const { initial = [], corpus = [], onChange, placeholder = 'Add tag...' } = opts
+  let tags = [...initial]
+
+  function suggest(query) {
+    const q = query.toLowerCase()
+    return corpus
+      .filter(t => t.toLowerCase().includes(q))
+      .filter(t => !tags.some(existing => existing.toLowerCase() === t.toLowerCase()))
+      .slice(0, 8)
+  }
+
+  function addTag(tag) {
+    const trimmed = tag.trim()
+    if (!trimmed) return
+    if (tags.some(t => t.toLowerCase() === trimmed.toLowerCase())) return
+    tags.push(trimmed)
+    build()
+    onChange?.(tags)
+  }
+
+  function removeTag(i) {
+    tags.splice(i, 1)
+    build()
+    onChange?.(tags)
+  }
+
+  function build() {
+    container.innerHTML = ''
+    tags.forEach((tag, i) => {
+      const chip = document.createElement('span')
+      chip.className = 'tag-chip-edit'
+      chip.innerHTML = `${escapeHtml(tag)}<button class="tag-chip-x" type="button">&times;</button>`
+      chip.querySelector('.tag-chip-x').addEventListener('click', (e) => { e.stopPropagation(); removeTag(i) })
+      container.appendChild(chip)
+    })
+
+    const input = document.createElement('input')
+    input.className = 'tag-editor-input'
+    input.placeholder = tags.length === 0 ? placeholder : ''
+    input.type = 'text'
+    container.appendChild(input)
+
+    const dd = document.createElement('div')
+    dd.className = 'tag-suggest-dropdown'
+    dd.style.display = 'none'
+    container.appendChild(dd)
+
+    input.addEventListener('input', () => {
+      const q = input.value.trim()
+      if (!q) { dd.style.display = 'none'; return }
+      const items = suggest(q)
+      if (!items.length) { dd.style.display = 'none'; return }
+      dd.innerHTML = items.map(s => `<button class="tag-suggest-item" type="button">${escapeHtml(s)}</button>`).join('')
+      dd.style.display = 'block'
+      dd.querySelectorAll('.tag-suggest-item').forEach(btn => {
+        btn.addEventListener('mousedown', (e) => {
+          e.preventDefault()
+          addTag(btn.textContent)
+          input.value = ''
+          dd.style.display = 'none'
+          input.focus()
+        })
+      })
+    })
+
+    input.addEventListener('keydown', (e) => {
+      if ((e.key === 'Enter' || e.key === ',') && input.value.trim()) {
+        e.preventDefault()
+        addTag(input.value.replace(/,/g, '').trim())
+        input.value = ''
+        dd.style.display = 'none'
+      }
+      if (e.key === 'Backspace' && !input.value && tags.length > 0) removeTag(tags.length - 1)
+    })
+
+    input.addEventListener('blur', () => {
+      setTimeout(() => { dd.style.display = 'none' }, 120)
+      if (input.value.trim()) { addTag(input.value.trim()); input.value = '' }
+    })
+
+    container.addEventListener('click', (e) => { if (e.target === container) input.focus() })
+  }
+
+  build()
+  return {
+    getTags: () => [...tags],
+    setTags: (t) => { tags = [...t]; build() },
+    focus: () => container.querySelector('.tag-editor-input')?.focus(),
+    destroy: () => { container.innerHTML = '' },
+  }
+}
+
+// ── Auto-grow & summary counter ──
+
+function autoGrow(textarea) {
+  textarea.style.height = 'auto'
+  textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px'
+}
+
+function bindSummaryCounter(textarea, counterEl, limit = 320) {
+  function update() {
+    const len = textarea.value.length
+    counterEl.textContent = len > 0 ? `${len}/${limit}` : ''
+    counterEl.classList.toggle('warn', len > limit)
+    autoGrow(textarea)
+  }
+  textarea.addEventListener('input', update)
+  update()
+}
+
+// ── Toast system ──
+
+function showToast(message, opts = {}) {
+  const { action, onAction, duration = 4000 } = opts
+  const container = document.getElementById('toastContainer')
+  const toast = document.createElement('div')
+  toast.className = 'toast'
+  toast.innerHTML = escapeHtml(message)
+  if (action) {
+    const btn = document.createElement('button')
+    btn.className = 'toast-action'
+    btn.textContent = action
+    btn.addEventListener('click', () => { toast.remove(); onAction?.() })
+    toast.appendChild(btn)
+  }
+  container.appendChild(toast)
+  const timer = setTimeout(() => toast.remove(), duration)
+  toast._timer = timer
 }
 
 // ── Render ──
@@ -1097,22 +1618,49 @@ const sortToggleEl = document.getElementById('sortToggle')
 const typeFilterEl = document.getElementById('typeFilter')
 const viewListEl = document.getElementById('viewList')
 const viewGraphEl = document.getElementById('viewGraph')
+const overlayEl = document.getElementById('overlay')
+const detailEl = document.getElementById('detail')
+const entryCountEl = document.getElementById('entryCount')
 
 function render() {
   if (!folderPresent) {
     tagBarEl.innerHTML = ''
+    entryCountEl.textContent = ''
     renderOffer()
     return
   }
   renderTagBar()
   renderTypeFilter()
   renderViewToggle()
+  renderEntryCount()
   if (viewMode === 'graph') renderGraph()
   else renderCards()
   sortToggleEl.textContent = sortMode === 'date' ? 'Newest' : 'A-Z'
 }
 
-// Offer-not-block panel shown when the knowledge/ folder does not exist.
+function renderEntryCount() {
+  const filtered = getFilteredEntries()
+  const total = entries.length
+  if (total === 0) { entryCountEl.textContent = ''; return }
+  if (filtered.length === total) {
+    entryCountEl.textContent = `${total} entries`
+  } else {
+    entryCountEl.textContent = `${filtered.length} of ${total}`
+  }
+}
+
+function renderSkeleton() {
+  contentEl.innerHTML = `<div class="card-grid">${
+    Array.from({ length: 8 }, () => `
+      <div class="card skeleton">
+        <div class="skeleton-line w60"></div>
+        <div class="skeleton-line w80"></div>
+        <div class="skeleton-line w40"></div>
+      </div>
+    `).join('')
+  }</div>`
+}
+
 function renderOffer() {
   contentEl.innerHTML = `
     <div class="empty-state">
@@ -1130,8 +1678,7 @@ function renderOffer() {
     if (errEl) errEl.hidden = true
     try {
       await runtime.call('app.enable', { app: 'knowledge' })
-      await loadEntries()
-      render()
+      await loadFirstPage()
     } catch (err) {
       console.warn('[knowledge] enable error:', err)
       if (errEl) {
@@ -1143,30 +1690,105 @@ function renderOffer() {
   })
 }
 
+// ── Tag bar ──
+
+const TAG_BAR_LIMIT = 12
+
 function renderTagBar() {
-  const tags = getAllTags()
-  if (tags.length === 0) {
-    tagBarEl.innerHTML = ''
-    return
+  const counts = computeTagCounts()
+  if (counts.size === 0) { tagBarEl.innerHTML = ''; return }
+
+  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1])
+  const visible = sorted.slice(0, TAG_BAR_LIMIT)
+  const overflow = sorted.slice(TAG_BAR_LIMIT)
+
+  // If active tag not in visible set, insert it
+  if (activeTag && !visible.some(([t]) => t === activeTag)) {
+    const active = sorted.find(([t]) => t === activeTag)
+    if (active) { visible.pop(); visible.unshift(active) }
   }
-  tagBarEl.innerHTML = tags.map(t =>
-    `<button class="tag-chip ${activeTag === t ? 'tag-chip--active' : ''}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`
+
+  tagBarEl.innerHTML = visible.map(([tag, count]) =>
+    `<button class="tag-chip ${activeTag === tag ? 'tag-chip--active' : ''}" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)} <span class="tag-count">${count}</span></button>`
   ).join('')
+
+  if (overflow.length > 0) {
+    tagBarEl.innerHTML += `<button class="tag-overflow-btn" id="tagOverflowBtn">+${overflow.length} more</button>`
+  }
 
   tagBarEl.querySelectorAll('.tag-chip').forEach(chip => {
     chip.addEventListener('click', () => {
-      const tag = chip.dataset.tag
-      activeTag = activeTag === tag ? '' : tag
+      activeTag = activeTag === chip.dataset.tag ? '' : chip.dataset.tag
       render()
     })
   })
+
+  const overflowBtn = document.getElementById('tagOverflowBtn')
+  if (overflowBtn) overflowBtn.addEventListener('click', () => openTagOverflow(overflowBtn, sorted))
 }
 
+let tagOverflowPanel = null
+
+function openTagOverflow(anchor, allTags) {
+  closeTagOverflow()
+  const panel = document.createElement('div')
+  panel.className = 'tag-overflow-panel'
+  const rect = anchor.getBoundingClientRect()
+  panel.style.top = (rect.bottom + 4) + 'px'
+  panel.style.left = Math.min(rect.left, window.innerWidth - 296) + 'px'
+  panel.style.display = 'block'
+
+  const searchInput = document.createElement('input')
+  searchInput.className = 'tag-overflow-search'
+  searchInput.placeholder = 'Filter tags...'
+  searchInput.type = 'text'
+  panel.appendChild(searchInput)
+
+  const list = document.createElement('div')
+  list.className = 'tag-overflow-list'
+  panel.appendChild(list)
+
+  function renderList(filter = '') {
+    const q = filter.toLowerCase()
+    const filtered = allTags.filter(([t]) => !q || t.toLowerCase().includes(q))
+    list.innerHTML = filtered.map(([tag, count]) =>
+      `<button class="tag-chip ${activeTag === tag ? 'tag-chip--active' : ''}" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)} <span class="tag-count">${count}</span></button>`
+    ).join('')
+    list.querySelectorAll('.tag-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        activeTag = activeTag === chip.dataset.tag ? '' : chip.dataset.tag
+        closeTagOverflow()
+        render()
+      })
+    })
+  }
+
+  searchInput.addEventListener('input', () => renderList(searchInput.value))
+  renderList()
+
+  document.body.appendChild(panel)
+  tagOverflowPanel = panel
+  searchInput.focus()
+  setTimeout(() => document.addEventListener('click', closeTagOverflowOnClick), 0)
+}
+
+function closeTagOverflowOnClick(e) {
+  if (tagOverflowPanel && !tagOverflowPanel.contains(e.target)) closeTagOverflow()
+}
+
+function closeTagOverflow() {
+  if (tagOverflowPanel) { tagOverflowPanel.remove(); tagOverflowPanel = null }
+  document.removeEventListener('click', closeTagOverflowOnClick)
+}
+
+// ── Type filter ──
+
 function renderTypeFilter() {
-  const types = getAllTypes()
+  const counts = computeTypeCounts()
+  const types = Object.keys(counts).sort()
   const options = ['<option value="">All types</option>']
   for (const type of types) {
-    options.push(`<option value="${escapeHtml(type)}" ${activeType === type ? 'selected' : ''}>${escapeHtml(type)}</option>`)
+    options.push(`<option value="${escapeHtml(type)}" ${activeType === type ? 'selected' : ''}>${escapeHtml(type)} (${counts[type]})</option>`)
   }
   typeFilterEl.innerHTML = options.join('')
 }
@@ -1175,6 +1797,8 @@ function renderViewToggle() {
   viewListEl.classList.toggle('view-toggle-btn--active', viewMode === 'list')
   viewGraphEl.classList.toggle('view-toggle-btn--active', viewMode === 'graph')
 }
+
+// ── Cards ──
 
 function renderCards() {
   const filtered = getFilteredEntries()
@@ -1198,8 +1822,9 @@ function renderCards() {
   contentEl.innerHTML = `<div class="card-grid">${filtered.map(renderCardHTML).join('')}</div>`
 
   contentEl.querySelectorAll('.card').forEach(card => {
-    card.addEventListener('click', () => {
-      openDetail(card.dataset.id)
+    card.addEventListener('click', () => openDetail(card.dataset.id))
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') openDetail(card.dataset.id)
     })
   })
 }
@@ -1213,16 +1838,70 @@ function renderCardHTML(entry) {
   const typeLabel = entry.type && entry.type !== 'note'
     ? `<div class="card-type">${escapeHtml(entry.type)}</div>`
     : ''
+  const linkCount = (entry.links || []).length
 
   return `
-    <div class="card" data-id="${entry.id}">
+    <div class="card" data-id="${entry.id}" data-type="${escapeHtml(entry.type || 'note')}" tabindex="0">
       ${typeLabel}
       <div class="card-title">${escapeHtml(entry.title || '(untitled)')}</div>
       ${tagsHtml ? `<div class="card-tags">${tagsHtml}</div>` : ''}
       ${excerpt ? `<div class="card-excerpt">${escapeHtml(excerpt)}</div>` : ''}
-      <div class="card-date">${date}</div>
+      <div class="card-footer">
+        <span class="card-date">${date}</span>
+        ${linkCount > 0 ? `<span class="card-links">${linkCount} link${linkCount !== 1 ? 's' : ''}</span>` : ''}
+      </div>
     </div>
   `
+}
+
+// ── Card keyboard navigation ──
+
+function moveCardFocus(dx, dy) {
+  const cards = [...contentEl.querySelectorAll('.card[tabindex="0"]')]
+  if (cards.length === 0) return
+  const active = document.activeElement
+  const idx = cards.indexOf(active)
+
+  if (idx === -1) { cards[0]?.focus(); return }
+
+  if (dx !== 0) {
+    const next = idx + dx
+    if (next >= 0 && next < cards.length) cards[next].focus()
+    return
+  }
+
+  if (dy !== 0) {
+    const rect = active.getBoundingClientRect()
+    const cx = rect.left + rect.width / 2
+    let best = null, bestDist = Infinity
+    for (let i = 0; i < cards.length; i++) {
+      if (i === idx) continue
+      const r = cards[i].getBoundingClientRect()
+      const isBelow = dy > 0 ? r.top > rect.bottom - 2 : r.bottom < rect.top + 2
+      if (!isBelow) continue
+      const dist = Math.abs(r.left + r.width / 2 - cx) + Math.abs(r.top - rect.top)
+      if (dist < bestDist) { bestDist = dist; best = i }
+    }
+    if (best !== null) cards[best].focus()
+  }
+}
+
+// ── Graph ──
+
+function graphColor(type) {
+  const palette = {
+    person: 'var(--type-person)',
+    org: 'var(--type-org)',
+    project: 'var(--type-project)',
+    record: 'var(--type-record)',
+    missing: 'var(--type-missing)',
+    note: 'var(--type-note)',
+  }
+  return palette[type] || 'var(--type-note)'
+}
+
+function nodeRadius(node) {
+  return Math.min(4 + (node.degree || 0) * 1.5, 20)
 }
 
 function renderGraph() {
@@ -1239,213 +1918,617 @@ function renderGraph() {
   }
 
   const graph = buildGraph(filtered)
+  graphNodes = graph.nodes
+  graphEdges = graph.edges
+  graphAdjacency = graph.adjacency
+
+  graphWidth = Math.max(contentEl.clientWidth - 32, 640)
+  graphHeight = Math.max(contentEl.clientHeight - 90, 520)
+
+  // Initial positions
+  const cx = graphWidth / 2
+  const cy = graphHeight / 2
+  const r = Math.min(graphWidth, graphHeight) * 0.35
+  graphNodes.forEach((node, i) => {
+    const angle = (i / Math.max(graphNodes.length, 1)) * Math.PI * 2
+    const jitter = 0.3 + (((i * 7 + 13) % 17) / 17) * 0.7
+    node.x = cx + Math.cos(angle) * r * jitter
+    node.y = cy + Math.sin(angle) * r * jitter
+    node.vx = 0
+    node.vy = 0
+    node.pinned = false
+  })
+
+  // Run synchronous layout
+  for (let i = 0; i < 200; i++) tickGraph(graphNodes, graphEdges, graphWidth, graphHeight)
+
+  // Build type legend
+  const typeCounts = {}
+  graphNodes.forEach(n => { if (!n.missing) typeCounts[n.type] = (typeCounts[n.type] || 0) + 1 })
+  const legendHtml = Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).map(([type, count]) =>
+    `<span class="graph-legend-item"><span class="graph-legend-dot" style="background: ${graphColor(type)}"></span>${type} (${count})</span>`
+  ).join('')
+
   contentEl.innerHTML = `
     <div class="graph-shell">
       <div class="graph-meta">${graph.nodes.length} nodes / ${graph.edges.length} links</div>
       <div class="graph-canvas">
-        ${renderGraphSvg(graph)}
+        ${renderGraphSvg()}
+        <div class="graph-legend">${legendHtml}</div>
       </div>
     </div>
   `
 
-  contentEl.querySelectorAll('.graph-node').forEach(node => {
-    node.addEventListener('click', () => {
-      const id = node.dataset.id
-      if (id && entries.some(entry => entry.id === id)) openDetail(id)
+  const svgEl = contentEl.querySelector('.graph-svg')
+  if (svgEl) {
+    setupGraphInteraction(svgEl)
+    setupGraphHover(svgEl)
+
+    svgEl.querySelectorAll('.graph-node').forEach(node => {
+      node.addEventListener('click', () => {
+        const id = node.dataset.id
+        if (id && entries.some(e => e.id === id) && !graphDragNode) openDetail(id)
+      })
     })
-  })
+  }
+
+  graphTransform = { x: 0, y: 0, scale: 1 }
+  fitGraphView()
+
+  graphAnimating = false
+  graphAnimFrames = 0
+  startGraphAnimation()
 }
 
 function buildGraph(sourceEntries) {
-  const nodesById = new Map(sourceEntries.map(entry => [entry.id, {
-    id: entry.id,
-    title: entry.title || entry.id,
-    type: entry.type || 'note',
-    missing: false,
-  }]))
-  const visibleIds = new Set(nodesById.keys())
+  const nodesById = new Map()
+  const degree = new Map()
   const edges = []
 
   for (const entry of sourceEntries) {
+    nodesById.set(entry.id, {
+      id: entry.id, title: entry.title || entry.id,
+      type: entry.type || 'note', missing: false,
+      x: 0, y: 0, vx: 0, vy: 0, pinned: false, degree: 0,
+    })
+    degree.set(entry.id, 0)
+  }
+
+  for (const entry of sourceEntries) {
     for (const link of entry.links || []) {
-      if (!visibleIds.has(link.target)) {
-        const target = entries.find(e => e.id === link.target)
-        if (!target) {
-          nodesById.set(link.target, { id: link.target, title: link.target, type: 'missing', missing: true })
-        } else if (!activeTag && !activeType && !searchQuery) {
-          nodesById.set(target.id, { id: target.id, title: target.title || target.id, type: target.type || 'note', missing: false })
+      if (!nodesById.has(link.target)) {
+        const full = entries.find(e => e.id === link.target)
+        if (full && !activeTag && !activeType && !searchQuery) {
+          nodesById.set(full.id, {
+            id: full.id, title: full.title || full.id,
+            type: full.type || 'note', missing: false,
+            x: 0, y: 0, vx: 0, vy: 0, pinned: false, degree: 0,
+          })
+        } else {
+          nodesById.set(link.target, {
+            id: link.target, title: link.target,
+            type: 'missing', missing: true,
+            x: 0, y: 0, vx: 0, vy: 0, pinned: false, degree: 0,
+          })
         }
+        degree.set(link.target, 0)
       }
-      if (nodesById.has(link.target)) edges.push({ source: entry.id, target: link.target, rel: link.rel, missing: !entries.some(e => e.id === link.target) })
+      edges.push({ source: entry.id, target: link.target, rel: link.rel, missing: !entries.some(e => e.id === link.target) })
+      degree.set(entry.id, (degree.get(entry.id) || 0) + 1)
+      degree.set(link.target, (degree.get(link.target) || 0) + 1)
     }
   }
 
   const nodes = [...nodesById.values()]
-  layoutGraph(nodes, edges)
-  return { nodes, edges }
+  nodes.forEach(n => { n.degree = degree.get(n.id) || 0 })
+
+  const adjacency = new Map()
+  for (const node of nodes) adjacency.set(node.id, new Set())
+  for (const edge of edges) {
+    adjacency.get(edge.source)?.add(edge.target)
+    adjacency.get(edge.target)?.add(edge.source)
+  }
+
+  return { nodes, edges, adjacency }
 }
 
-function layoutGraph(nodes, edges) {
-  const width = Math.max(contentEl.clientWidth - 32, 640)
-  const height = Math.max(contentEl.clientHeight - 90, 520)
-  const types = [...new Set(nodes.map(node => node.type))].sort()
-  const typeIndex = new Map(types.map((type, index) => [type, index]))
-  const radius = Math.min(width, height) * 0.32
+function tickGraph(nodes, edges, width, height) {
+  const nodeMap = new Map(nodes.map(n => [n.id, n]))
   const cx = width / 2
   const cy = height / 2
 
-  nodes.forEach((node, index) => {
-    const typeAngle = ((typeIndex.get(node.type) || 0) / Math.max(types.length, 1)) * Math.PI * 2 - Math.PI / 2
-    const jitter = (index / Math.max(nodes.length, 1)) * Math.PI * 2
-    node.x = cx + Math.cos(typeAngle) * radius + Math.cos(jitter) * 35
-    node.y = cy + Math.sin(typeAngle) * radius + Math.sin(jitter) * 35
-    node.vx = 0
-    node.vy = 0
-  })
-
-  const nodeMap = new Map(nodes.map(node => [node.id, node]))
-  for (let step = 0; step < 120; step++) {
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        const a = nodes[i]
-        const b = nodes[j]
-        let dx = b.x - a.x
-        let dy = b.y - a.y
-        let d2 = dx * dx + dy * dy
-        if (d2 < 1) { dx = 1; dy = 0; d2 = 1 }
-        const force = 520 / d2
-        a.vx -= dx * force
-        a.vy -= dy * force
-        b.vx += dx * force
-        b.vy += dy * force
-      }
-    }
-
-    for (const edge of edges) {
-      const source = nodeMap.get(edge.source)
-      const target = nodeMap.get(edge.target)
-      if (!source || !target) continue
-      const dx = target.x - source.x
-      const dy = target.y - source.y
-      const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1)
-      const force = (dist - 135) * 0.012
-      const fx = dx / dist * force
-      const fy = dy / dist * force
-      source.vx += fx
-      source.vy += fy
-      target.vx -= fx
-      target.vy -= fy
-    }
-
-    for (const node of nodes) {
-      const typeAngle = ((typeIndex.get(node.type) || 0) / Math.max(types.length, 1)) * Math.PI * 2 - Math.PI / 2
-      const tx = cx + Math.cos(typeAngle) * radius
-      const ty = cy + Math.sin(typeAngle) * radius
-      node.vx += (tx - node.x) * 0.006
-      node.vy += (ty - node.y) * 0.006
-      node.x = clamp(node.x + node.vx, 70, width - 90)
-      node.y = clamp(node.y + node.vy, 45, height - 45)
-      node.vx *= 0.82
-      node.vy *= 0.82
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i]
+      const b = nodes[j]
+      let dx = b.x - a.x
+      let dy = b.y - a.y
+      let d2 = dx * dx + dy * dy
+      if (d2 < 1) { dx = 1; dy = 0; d2 = 1 }
+      const force = 800 / d2
+      if (!a.pinned) { a.vx -= dx * force; a.vy -= dy * force }
+      if (!b.pinned) { b.vx += dx * force; b.vy += dy * force }
     }
   }
 
-  nodes.width = width
-  nodes.height = height
-}
-
-function renderGraphSvg(graph) {
-  const width = graph.nodes.width || 800
-  const height = graph.nodes.height || 520
-  const nodeMap = new Map(graph.nodes.map(node => [node.id, node]))
-  const edges = graph.edges.map(edge => {
+  for (const edge of edges) {
     const source = nodeMap.get(edge.source)
     const target = nodeMap.get(edge.target)
-    if (!source || !target) return ''
-    return `<line class="graph-edge ${edge.missing ? 'graph-edge--missing' : ''}" x1="${source.x.toFixed(1)}" y1="${source.y.toFixed(1)}" x2="${target.x.toFixed(1)}" y2="${target.y.toFixed(1)}"><title>${escapeHtml(edge.rel)}</title></line>`
-  }).join('')
-  const nodes = graph.nodes.map(node => `
-    <g class="graph-node" data-id="${escapeHtml(node.id)}" transform="translate(${node.x.toFixed(1)} ${node.y.toFixed(1)})">
-      <circle r="${node.missing ? 6 : 8}" fill="${graphColor(node.type)}"></circle>
-      <text x="12" y="-1">${escapeHtml(shortLabel(node.title, 28))}</text>
-      <text class="graph-node-type" x="12" y="11">${escapeHtml(node.type)}</text>
-      <title>${escapeHtml(node.id)}</title>
-    </g>
-  `).join('')
-  return `<svg class="graph-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Knowledge graph">${edges}${nodes}</svg>`
-}
-
-function graphColor(type) {
-  const palette = {
-    person: 'var(--color-accent)',
-    org: 'var(--color-ink-2)',
-    project: 'var(--color-ink)',
-    record: 'var(--color-rem)',
-    missing: 'var(--color-ink-4)',
-    note: 'var(--color-ink-3)',
+    if (!source || !target) continue
+    const dx = target.x - source.x
+    const dy = target.y - source.y
+    const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1)
+    const force = (dist - 120) * 0.015
+    const fx = dx / dist * force
+    const fy = dy / dist * force
+    if (!source.pinned) { source.vx += fx; source.vy += fy }
+    if (!target.pinned) { target.vx -= fx; target.vy -= fy }
   }
-  return palette[type] || 'var(--color-ink-3)'
+
+  for (const node of nodes) {
+    if (node.pinned) continue
+    node.vx += (cx - node.x) * 0.002
+    node.vy += (cy - node.y) * 0.002
+
+    const margin = 40
+    if (node.x < margin) node.vx += (margin - node.x) * 0.04
+    if (node.x > width - margin) node.vx += (width - margin - node.x) * 0.04
+    if (node.y < margin) node.vy += (margin - node.y) * 0.04
+    if (node.y > height - margin) node.vy += (height - margin - node.y) * 0.04
+
+    node.vx *= 0.8
+    node.vy *= 0.8
+    node.x += node.vx
+    node.y += node.vy
+  }
 }
 
-function shortLabel(value, max) {
-  const text = String(value || '')
-  return text.length > max ? text.slice(0, max - 3) + '...' : text
+function renderGraphSvg() {
+  const nodeMap = new Map(graphNodes.map(n => [n.id, n]))
+  let svg = `<svg class="graph-svg" viewBox="0 0 ${graphWidth} ${graphHeight}" role="img" aria-label="Knowledge graph">`
+  svg += `<g class="graph-world">`
+
+  for (const edge of graphEdges) {
+    const s = nodeMap.get(edge.source)
+    const t = nodeMap.get(edge.target)
+    if (!s || !t) continue
+    const cls = `graph-edge${edge.missing ? ' graph-edge--missing' : ''}`
+    const mx = ((s.x + t.x) / 2).toFixed(1)
+    const my = ((s.y + t.y) / 2 - 4).toFixed(1)
+    svg += `<g class="graph-link" data-source="${escapeHtml(edge.source)}" data-target="${escapeHtml(edge.target)}">`
+    svg += `<line class="${cls}" x1="${s.x.toFixed(1)}" y1="${s.y.toFixed(1)}" x2="${t.x.toFixed(1)}" y2="${t.y.toFixed(1)}"></line>`
+    svg += `<text class="graph-edge-label" x="${mx}" y="${my}">${escapeHtml(edge.rel)}</text>`
+    svg += `</g>`
+  }
+
+  for (const node of graphNodes) {
+    const r = nodeRadius(node)
+    svg += `<g class="graph-node" data-id="${escapeHtml(node.id)}" transform="translate(${node.x.toFixed(1)} ${node.y.toFixed(1)})">`
+    svg += `<circle r="${r}" fill="${graphColor(node.type)}"></circle>`
+    svg += `<text x="${r + 4}" y="-1">${escapeHtml(shortLabel(node.title, 28))}</text>`
+    svg += `<text class="graph-node-type" x="${r + 4}" y="11">${escapeHtml(node.type)}</text>`
+    svg += `</g>`
+  }
+
+  svg += `</g></svg>`
+  return svg
 }
 
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value))
+function startGraphAnimation() {
+  if (graphAnimating) return
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  graphAnimating = true
+  graphAnimFrames = 0
+
+  function animate() {
+    if (!graphAnimating || graphAnimFrames >= 120) { graphAnimating = false; return }
+    graphAnimFrames++
+    tickGraph(graphNodes, graphEdges, graphWidth, graphHeight)
+    updateGraphPositions()
+    requestAnimationFrame(animate)
+  }
+  requestAnimationFrame(animate)
 }
 
-// ── Detail View ──
+function updateGraphPositions() {
+  const svg = contentEl.querySelector('.graph-svg')
+  if (!svg) return
+  const nodeMap = new Map(graphNodes.map(n => [n.id, n]))
 
-const overlayEl = document.getElementById('overlay')
-const detailEl = document.getElementById('detail')
-const detailTitleEl = document.getElementById('detailTitle')
-const detailTagsEl = document.getElementById('detailTags')
-const detailTypeEl = document.getElementById('detailType')
-const detailSummaryEl = document.getElementById('detailSummary')
-const detailBodyEl = document.getElementById('detailBody')
-const detailDateEl = document.getElementById('detailDate')
-const detailEditBtn = document.getElementById('detailEditBtn')
-const detailDeleteBtn = document.getElementById('detailDeleteBtn')
-const detailOpenBtn = document.getElementById('detailOpenBtn')
+  svg.querySelectorAll('.graph-node').forEach(el => {
+    const node = nodeMap.get(el.dataset.id)
+    if (node) el.setAttribute('transform', `translate(${node.x.toFixed(1)} ${node.y.toFixed(1)})`)
+  })
+
+  svg.querySelectorAll('.graph-link').forEach(group => {
+    const s = nodeMap.get(group.dataset.source)
+    const t = nodeMap.get(group.dataset.target)
+    if (!s || !t) return
+    const line = group.querySelector('line')
+    if (line) {
+      line.setAttribute('x1', s.x.toFixed(1)); line.setAttribute('y1', s.y.toFixed(1))
+      line.setAttribute('x2', t.x.toFixed(1)); line.setAttribute('y2', t.y.toFixed(1))
+    }
+    const label = group.querySelector('text')
+    if (label) {
+      label.setAttribute('x', ((s.x + t.x) / 2).toFixed(1))
+      label.setAttribute('y', ((s.y + t.y) / 2 - 4).toFixed(1))
+    }
+  })
+}
+
+function fitGraphView() {
+  if (graphNodes.length === 0) return
+  const svgEl = contentEl.querySelector('.graph-svg')
+  if (!svgEl) return
+  const vb = svgEl.getAttribute('viewBox')?.split(' ').map(Number) || [0, 0, graphWidth, graphHeight]
+  const vw = vb[2], vh = vb[3]
+  const pad = 60
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  graphNodes.forEach(n => {
+    if (n.x < minX) minX = n.x; if (n.x > maxX) maxX = n.x
+    if (n.y < minY) minY = n.y; if (n.y > maxY) maxY = n.y
+  })
+  const rangeX = (maxX - minX) || 100
+  const rangeY = (maxY - minY) || 100
+  const scale = Math.min((vw - pad * 2) / rangeX, (vh - pad * 2) / rangeY, 2.5)
+  graphTransform.scale = scale
+  graphTransform.x = (vw / 2) - ((minX + maxX) / 2) * scale
+  graphTransform.y = (vh / 2) - ((minY + maxY) / 2) * scale
+  applyGraphTransform()
+}
+
+function applyGraphTransform() {
+  const world = contentEl.querySelector('.graph-world')
+  if (world) {
+    world.setAttribute('transform',
+      `translate(${graphTransform.x.toFixed(1)} ${graphTransform.y.toFixed(1)}) scale(${graphTransform.scale.toFixed(3)})`)
+  }
+}
+
+function svgPoint(svg, clientX, clientY) {
+  const pt = svg.createSVGPoint()
+  pt.x = clientX
+  pt.y = clientY
+  return pt.matrixTransform(svg.getScreenCTM().inverse())
+}
+
+function setupGraphInteraction(svgEl) {
+  svgEl.addEventListener('wheel', (e) => {
+    e.preventDefault()
+    const pt = svgPoint(svgEl, e.clientX, e.clientY)
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
+    const newScale = Math.max(0.15, Math.min(5, graphTransform.scale * factor))
+    const ratio = newScale / graphTransform.scale
+    graphTransform.x = pt.x - (pt.x - graphTransform.x) * ratio
+    graphTransform.y = pt.y - (pt.y - graphTransform.y) * ratio
+    graphTransform.scale = newScale
+    applyGraphTransform()
+  }, { passive: false })
+
+  svgEl.addEventListener('pointerdown', (e) => {
+    const nodeEl = e.target.closest('.graph-node')
+    if (nodeEl) {
+      const node = graphNodes.find(n => n.id === nodeEl.dataset.id)
+      if (node) {
+        graphDragNode = node
+        node.pinned = true
+        svgEl.setPointerCapture(e.pointerId)
+        e.stopPropagation()
+      }
+    } else {
+      graphPanStart = { x: e.clientX, y: e.clientY, tx: graphTransform.x, ty: graphTransform.y }
+      svgEl.setPointerCapture(e.pointerId)
+    }
+  })
+
+  svgEl.addEventListener('pointermove', (e) => {
+    if (graphDragNode) {
+      const pt = svgPoint(svgEl, e.clientX, e.clientY)
+      graphDragNode.x = (pt.x - graphTransform.x) / graphTransform.scale
+      graphDragNode.y = (pt.y - graphTransform.y) / graphTransform.scale
+      updateGraphPositions()
+      if (!graphAnimating) { graphAnimFrames = 0; startGraphAnimation() }
+    } else if (graphPanStart) {
+      const dx = e.clientX - graphPanStart.x
+      const dy = e.clientY - graphPanStart.y
+      graphTransform.x = graphPanStart.tx + dx
+      graphTransform.y = graphPanStart.ty + dy
+      applyGraphTransform()
+    }
+  })
+
+  svgEl.addEventListener('pointerup', () => {
+    if (graphDragNode) { graphDragNode.pinned = false; graphDragNode = null }
+    graphPanStart = null
+  })
+}
+
+function setupGraphHover(svgEl) {
+  svgEl.addEventListener('pointerover', (e) => {
+    const nodeEl = e.target.closest('.graph-node')
+    if (!nodeEl || !graphAdjacency) return
+    const id = nodeEl.dataset.id
+    const neighbors = graphAdjacency.get(id) || new Set()
+
+    svgEl.querySelectorAll('.graph-node').forEach(el => {
+      if (el.dataset.id === id || neighbors.has(el.dataset.id)) {
+        el.classList.add('hl')
+      } else {
+        el.classList.add('dim')
+      }
+    })
+    svgEl.querySelectorAll('.graph-link').forEach(el => {
+      if (el.dataset.source === id || el.dataset.target === id) {
+        el.classList.add('hl')
+      } else {
+        el.classList.add('dim')
+      }
+    })
+  })
+
+  svgEl.addEventListener('pointerout', (e) => {
+    const nodeEl = e.target.closest('.graph-node')
+    if (!nodeEl) return
+    svgEl.querySelectorAll('.hl, .dim').forEach(el => el.classList.remove('hl', 'dim'))
+  })
+}
+
+// ── Detail Overlay ──
+
+let detailTagEditor = null
+let detailNeighbors = null
 
 async function openDetail(id) {
   const entry = entries.find(e => e.id === id)
   if (!entry) return
   openDetailId = id
   editMode = false
-  detailTitleEl.value = entry.title || ''
-  detailTagsEl.value = (entry.tags || []).join(', ')
-  detailTypeEl.value = entry.type || 'note'
-  detailSummaryEl.value = entry.summary || ''
-  renderDetailBody(entry)
-  detailDateEl.textContent = entry.created ? 'Created ' + formatDate(entry.created) : ''
-  detailEditBtn.textContent = 'Edit'
-  detailEditBtn.classList.remove('detail-edit-btn--active')
+  deleteArmed = false
+  detailNeighbors = null
+
+  renderDetailView(entry)
   overlayEl.style.display = 'flex'
-  detailTitleEl.focus()
-  // Body is omitted from list items; fetch it lazily then re-render the view.
-  await ensureBody(entry)
-  detailTypeEl.value = entry.type || 'note'
-  detailSummaryEl.value = entry.summary || ''
-  if (openDetailId === id && !editMode) renderDetailBody(entry)
+
+  // Load body and backlinks in parallel
+  const [, neighbors] = await Promise.all([
+    ensureBody(entry),
+    runtime.call('knowledge.neighbors', { id }).catch(() => null),
+  ])
+
+  if (openDetailId !== id) return
+  detailNeighbors = neighbors
+  if (!editMode) renderDetailView(entry)
 }
 
-function renderDetailBody(entry) {
-  if (editMode) {
-    detailBodyEl.innerHTML = `<textarea class="detail-textarea" id="detailTextarea" placeholder="Write markdown...">${escapeHtml(entry.body || '')}</textarea>`
-  } else {
-    detailBodyEl.innerHTML = `
-      <div class="detail-body-view">${renderMarkdown(entry.body)}</div>
-      ${renderDetailLinks(entry)}
-    `
-    bindDetailLinks()
+function renderDetailView(entry) {
+  const tagsHtml = (entry.tags || []).map(t =>
+    `<span class="detail-tag-chip">${escapeHtml(t)}</span>`
+  ).join('')
+  const summaryHtml = entry.summary
+    ? `<div class="detail-summary-view">${escapeHtml(entry.summary)}</div>`
+    : ''
+
+  const outLinks = renderLinksSection('Links', entry.links || [])
+  const incoming = detailNeighbors?.incoming || []
+  const inLinks = incoming.length > 0
+    ? renderBacklinksSection(incoming)
+    : ''
+
+  const bodyContent = typeof entry.body === 'string'
+    ? `<div class="detail-body-view">${renderMarkdown(entry.body)}</div>`
+    : `<div class="detail-body-skeleton">
+        <div class="skeleton-line w80"></div>
+        <div class="skeleton-line w60"></div>
+        <div class="skeleton-line w80"></div>
+        <div class="skeleton-line w40"></div>
+      </div>`
+
+  detailEl.innerHTML = `
+    <div class="detail-header">
+      <span class="detail-title-text">${escapeHtml(entry.title || '(untitled)')}</span>
+      <button class="detail-open-btn" id="detailOpenBtn" title="Open in editor">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        Open
+      </button>
+      <button class="detail-delete-btn" id="detailDeleteBtn" title="Delete entry" aria-label="Delete entry">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>
+      </button>
+    </div>
+    <div class="detail-meta">
+      ${tagsHtml ? `<div class="detail-meta-row"><span class="detail-meta-label">Tags</span><div class="detail-tags-view">${tagsHtml}</div></div>` : ''}
+      <div class="detail-meta-row">
+        <span class="detail-meta-label">Type</span>
+        <span class="detail-meta-value detail-type-badge" style="color: ${graphColor(entry.type || 'note')}">${escapeHtml(entry.type || 'note')}</span>
+      </div>
+      ${summaryHtml ? `<div class="detail-meta-row"><span class="detail-meta-label">Summary</span><div class="detail-meta-value">${summaryHtml}</div></div>` : ''}
+    </div>
+    <div class="detail-body">${bodyContent}</div>
+    ${outLinks}${inLinks}
+    <div class="detail-footer">
+      <span class="detail-date">${entry.created ? 'Created ' + formatDate(entry.created) : ''}</span>
+      <span class="detail-spacer"></span>
+      <button class="detail-edit-btn" id="detailEditBtn">Edit</button>
+    </div>
+  `
+
+  bindDetailActions(entry)
+}
+
+function renderDetailEdit(entry) {
+  detailEl.innerHTML = `
+    <div class="detail-header">
+      <input class="detail-title-input" id="detailTitle" type="text" value="${escapeAttr(entry.title || '')}" placeholder="Entry title...">
+      <button class="detail-open-btn" id="detailOpenBtn" title="Open in editor">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        Open
+      </button>
+      <button class="detail-delete-btn" id="detailDeleteBtn" title="Delete entry" aria-label="Delete entry">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>
+      </button>
+    </div>
+    <div class="detail-meta">
+      <div class="detail-meta-row">
+        <span class="detail-meta-label">Tags</span>
+        <div class="tag-editor" id="detailTagEditorEl" style="flex:1;min-width:0"></div>
+      </div>
+      <div class="detail-meta-row">
+        <span class="detail-meta-label">Type</span>
+        <select class="detail-select" id="detailType" style="flex:1;min-width:0">
+          <option value="note" ${entry.type === 'note' ? 'selected' : ''}>note</option>
+          <option value="person" ${entry.type === 'person' ? 'selected' : ''}>person</option>
+          <option value="org" ${entry.type === 'org' ? 'selected' : ''}>org</option>
+          <option value="project" ${entry.type === 'project' ? 'selected' : ''}>project</option>
+          <option value="record" ${entry.type === 'record' ? 'selected' : ''}>record</option>
+        </select>
+      </div>
+      <div class="detail-meta-row" style="align-items:flex-start">
+        <span class="detail-meta-label" style="padding-top:5px">Summary</span>
+        <div class="summary-wrap" style="flex:1;min-width:0">
+          <textarea class="detail-summary-input" id="detailSummary" rows="2" maxlength="1000" placeholder="optional short retrieval summary...">${escapeHtml(entry.summary || '')}</textarea>
+          <span class="summary-counter" id="detailSummaryCounter"></span>
+        </div>
+      </div>
+    </div>
+    <div class="detail-body">
+      <textarea class="detail-textarea" id="detailTextarea" placeholder="Write markdown...">${escapeHtml(entry.body || '')}</textarea>
+    </div>
+    <div class="detail-footer">
+      <span class="detail-date">${entry.created ? 'Created ' + formatDate(entry.created) : ''}</span>
+      <span class="detail-spacer"></span>
+      <button class="detail-cancel-btn" id="detailCancelBtn">Cancel</button>
+      <button class="detail-save-btn" id="detailSaveBtn">Save</button>
+    </div>
+  `
+
+  detailTagEditor = createTagEditor(document.getElementById('detailTagEditorEl'), {
+    initial: entry.tags || [],
+    corpus: tagCorpus,
+  })
+
+  const summaryEl = document.getElementById('detailSummary')
+  const counterEl = document.getElementById('detailSummaryCounter')
+  if (summaryEl && counterEl) bindSummaryCounter(summaryEl, counterEl)
+
+  document.getElementById('detailSaveBtn').addEventListener('click', () => {
+    saveDetailChanges()
+    editMode = false
+    const updated = entries.find(e => e.id === openDetailId)
+    if (updated) renderDetailView(updated)
+  })
+
+  document.getElementById('detailCancelBtn').addEventListener('click', () => {
+    editMode = false
+    const entry = entries.find(e => e.id === openDetailId)
+    if (entry) renderDetailView(entry)
+  })
+
+  bindDetailActions(entry)
+  document.getElementById('detailTitle')?.focus()
+}
+
+async function saveDetailChanges() {
+  const entry = entries.find(e => e.id === openDetailId)
+  if (!entry) return
+
+  const titleEl = document.getElementById('detailTitle')
+  const typeEl = document.getElementById('detailType')
+  const summaryEl = document.getElementById('detailSummary')
+  const bodyEl = document.getElementById('detailTextarea')
+
+  if (titleEl) entry.title = titleEl.value.trim() || entry.title
+  if (typeEl) entry.type = typeEl.value || 'note'
+  if (summaryEl) entry.summary = summaryEl.value.trim()
+  if (bodyEl) entry.body = bodyEl.value
+  if (detailTagEditor) entry.tags = detailTagEditor.getTags()
+
+  await saveEntry(entry)
+  updateTagCorpus()
+}
+
+function bindDetailActions(entry) {
+  document.getElementById('detailEditBtn')?.addEventListener('click', () => {
+    editMode = true
+    renderDetailEdit(entry)
+  })
+
+  document.getElementById('detailOpenBtn')?.addEventListener('click', () => {
+    runtime.call('editor.open', { path: `knowledge/${entry.id}.md` })
+  })
+
+  document.getElementById('detailDeleteBtn')?.addEventListener('click', () => armDelete())
+
+  // Link clicks
+  detailEl.querySelectorAll('.detail-link-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id
+      if (id) openDetail(id)
+    })
+  })
+}
+
+function armDelete() {
+  const btn = document.getElementById('detailDeleteBtn')
+  if (!btn) return
+
+  if (deleteArmed) {
+    clearTimeout(deleteArmTimer)
+    deleteArmed = false
+    confirmDelete()
+    return
   }
+
+  deleteArmed = true
+  btn.classList.add('detail-delete-btn--armed')
+  btn.innerHTML = 'Confirm?'
+  deleteArmTimer = setTimeout(() => {
+    deleteArmed = false
+    if (btn.isConnected) {
+      btn.classList.remove('detail-delete-btn--armed')
+      btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>`
+    }
+  }, 3000)
 }
 
-function renderDetailLinks(entry) {
-  const links = entry.links || []
+async function confirmDelete() {
+  const entry = entries.find(e => e.id === openDetailId)
+  if (!entry) return
+
+  await ensureBody(entry)
+  const snapshot = JSON.parse(JSON.stringify(entry))
+
+  openDetailId = null
+  overlayEl.style.display = 'none'
+  entries = entries.filter(e => e.id !== snapshot.id)
+  updateTagCorpus()
+  render()
+
+  await runtime.call('knowledge.delete', { id: snapshot.id })
+
+  showToast(`Deleted "${snapshot.title}"`, {
+    action: 'Undo',
+    duration: 6000,
+    onAction: async () => {
+      try {
+        const result = await runtime.call('knowledge.create', {
+          id: snapshot.id,
+          title: snapshot.title,
+          type: snapshot.type,
+          summary: snapshot.summary,
+          tags: snapshot.tags,
+          links: (snapshot.links || []).map(l => `${l.rel} ${l.target}`),
+          extra: snapshot.extra,
+          body: snapshot.body || '',
+        })
+        if (result) { entries.push(normEntry(result)); updateTagCorpus(); render() }
+      } catch (err) {
+        showToast('Undo failed: ' + (err?.message || err))
+      }
+    }
+  })
+}
+
+function renderLinksSection(label, links) {
   if (links.length === 0) return ''
   const items = links.map(link => {
     const target = entries.find(e => e.id === link.target)
@@ -1459,103 +2542,38 @@ function renderDetailLinks(entry) {
   }).join('')
   return `
     <div class="detail-links">
-      <span class="detail-links-label">Links</span>
+      <span class="detail-links-label">${escapeHtml(label)}</span>
       <div class="detail-links-list">${items}</div>
     </div>
   `
 }
 
-function bindDetailLinks() {
-  detailBodyEl.querySelectorAll('.detail-link-item').forEach(button => {
-    button.addEventListener('click', () => {
-      const id = button.dataset.id
-      if (id) openDetail(id)
-    })
-  })
+function renderBacklinksSection(incoming) {
+  const items = incoming.map(link => `
+    <button class="detail-link-item" data-id="${escapeHtml(link.id)}">
+      <span class="detail-link-rel">${escapeHtml(link.rel)}</span>
+      <span class="detail-link-title">${escapeHtml(link.title || link.id)}</span>
+    </button>
+  `).join('')
+  return `
+    <div class="detail-links">
+      <span class="detail-links-label">Referenced by</span>
+      <div class="detail-links-list">${items}</div>
+    </div>
+  `
 }
 
 function closeDetail() {
-  if (openDetailId) saveDetailChanges()
   openDetailId = null
   editMode = false
+  deleteArmed = false
+  if (detailTagEditor) { detailTagEditor.destroy(); detailTagEditor = null }
   overlayEl.style.display = 'none'
   render()
 }
 
-function saveDetailChanges() {
-  const entry = entries.find(e => e.id === openDetailId)
-  if (!entry) return
-  entry.title = detailTitleEl.value.trim() || entry.title
-  entry.type = detailTypeEl.value || 'note'
-  entry.summary = detailSummaryEl.value.trim()
-  entry.tags = detailTagsEl.value.split(',').map(t => t.trim()).filter(Boolean)
-  if (editMode) {
-    const textarea = document.getElementById('detailTextarea')
-    if (textarea) entry.body = textarea.value
-  }
-  saveEntry(entry)
-}
-
-// Toggle edit mode
-detailEditBtn.addEventListener('click', () => {
-  const entry = entries.find(e => e.id === openDetailId)
-  if (!entry) return
-
-  if (editMode) {
-    // Save and switch to view
-    const textarea = document.getElementById('detailTextarea')
-    if (textarea) entry.body = textarea.value
-    editMode = false
-    detailEditBtn.textContent = 'Edit'
-    detailEditBtn.classList.remove('detail-edit-btn--active')
-    saveEntry(entry)
-  } else {
-    // Switch to edit
-    editMode = true
-    detailEditBtn.textContent = 'Done'
-    detailEditBtn.classList.add('detail-edit-btn--active')
-  }
-  renderDetailBody(entry)
-})
-
-// Delete
-detailDeleteBtn.addEventListener('click', async () => {
-  const id = openDetailId
-  if (!id) return
-  const entry = entries.find(e => e.id === id)
-  const title = entry?.title || id
-  const confirmed = window.confirm(`Delete "${title}"?\n\nThis cannot be undone.`)
-  if (!confirmed) return
-  openDetailId = null
-  overlayEl.style.display = 'none'
-  await deleteEntry(id)
-  render()
-})
-
-// Open in editor. Knowledge files live at {workspace}/knowledge/{id}.md.
-detailOpenBtn.addEventListener('click', () => {
-  const entry = entries.find(e => e.id === openDetailId)
-  if (!entry) return
-  runtime.call('editor.open', { path: `knowledge/${entry.id}.md` })
-})
-
-// Close on overlay click
 overlayEl.addEventListener('click', (e) => {
   if (e.target === overlayEl) closeDetail()
-})
-
-// Save on title/tags blur
-detailTitleEl.addEventListener('blur', () => {
-  if (openDetailId) saveDetailChanges()
-})
-detailTagsEl.addEventListener('blur', () => {
-  if (openDetailId) saveDetailChanges()
-})
-detailTypeEl.addEventListener('change', () => {
-  if (openDetailId) saveDetailChanges()
-})
-detailSummaryEl.addEventListener('blur', () => {
-  if (openDetailId) saveDetailChanges()
 })
 
 // ── New Entry Form ──
@@ -1563,17 +2581,26 @@ detailSummaryEl.addEventListener('blur', () => {
 const newOverlayEl = document.getElementById('newOverlay')
 const newTypeEl = document.getElementById('newType')
 const newTitleEl = document.getElementById('newTitle')
-const newTagsEl = document.getElementById('newTags')
 const newSummaryEl = document.getElementById('newSummary')
 const newBodyEl = document.getElementById('newBody')
+let newTagEditor = null
 
 function openNewForm() {
   showNewForm = true
   newTypeEl.value = activeType || 'note'
   newTitleEl.value = ''
-  newTagsEl.value = ''
   newSummaryEl.value = ''
   newBodyEl.value = ''
+
+  if (newTagEditor) newTagEditor.destroy()
+  newTagEditor = createTagEditor(document.getElementById('newTagEditor'), {
+    initial: [],
+    corpus: tagCorpus,
+  })
+
+  const counterEl = document.getElementById('newSummaryCounter')
+  if (counterEl) bindSummaryCounter(newSummaryEl, counterEl)
+
   newOverlayEl.style.display = 'flex'
   requestAnimationFrame(() => newTitleEl.focus())
 }
@@ -1584,13 +2611,13 @@ function closeNewForm() {
 }
 
 document.getElementById('btnNew').addEventListener('click', openNewForm)
-
 document.getElementById('newCancel').addEventListener('click', closeNewForm)
 
 document.getElementById('newSave').addEventListener('click', async () => {
   const title = newTitleEl.value.trim()
   if (!title) { newTitleEl.focus(); return }
-  const entry = await createEntry(title, newTypeEl.value || 'note', newSummaryEl.value.trim(), newTagsEl.value, newBodyEl.value)
+  const tags = newTagEditor ? newTagEditor.getTags() : []
+  const entry = await createEntry(title, newTypeEl.value || 'note', newSummaryEl.value.trim(), tags, newBodyEl.value)
   closeNewForm()
   render()
   if (entry) openDetail(entry.id)
@@ -1600,53 +2627,51 @@ newOverlayEl.addEventListener('click', (e) => {
   if (e.target === newOverlayEl) closeNewForm()
 })
 
-// Enter in title field submits new form
 newTitleEl.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    e.preventDefault()
-    document.getElementById('newSave').click()
-  }
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('newSave').click() }
 })
 
-// ── Sort Toggle ──
+// ── Sort & View Toggles ──
 
-sortToggleEl.addEventListener('click', () => {
-  sortMode = sortMode === 'date' ? 'alpha' : 'date'
-  render()
-})
-
-viewListEl.addEventListener('click', () => {
-  viewMode = 'list'
-  render()
-})
-
-viewGraphEl.addEventListener('click', () => {
-  viewMode = 'graph'
-  render()
-})
-
-typeFilterEl.addEventListener('change', (e) => {
-  activeType = e.target.value
-  render()
-})
+sortToggleEl.addEventListener('click', () => { sortMode = sortMode === 'date' ? 'alpha' : 'date'; render() })
+viewListEl.addEventListener('click', () => { viewMode = 'list'; render() })
+viewGraphEl.addEventListener('click', () => { viewMode = 'graph'; render() })
+typeFilterEl.addEventListener('change', (e) => { activeType = e.target.value; render() })
 
 // ── Search ──
 
 document.getElementById('searchInput').addEventListener('input', (e) => {
   searchQuery = e.target.value
+  clearTimeout(searchTimer)
+  searchResults = null
+
+  if (searchQuery.length >= 2) {
+    searchTimer = setTimeout(async () => {
+      const seq = ++searchSeq
+      try {
+        const result = await runtime.call('knowledge.search', { query: searchQuery })
+        if (seq !== searchSeq) return
+        searchResults = (result?.items || []).map(normEntry)
+      } catch {
+        searchResults = null
+      }
+      render()
+    }, SEARCH_DEBOUNCE_MS)
+  }
+
   render()
 })
 
 // ── Keyboard Shortcuts ──
 
 document.addEventListener('keydown', (e) => {
-  // Don't capture if inside an input/textarea
   const tag = document.activeElement?.tagName
-  const isInput = tag === 'INPUT' || tag === 'TEXTAREA'
+  const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
 
   if (e.key === 'Escape') {
     if (openDetailId) { closeDetail(); return }
     if (showNewForm) { closeNewForm(); return }
+    closeTagOverflow()
     if (isInput) { document.activeElement.blur(); return }
   }
 
@@ -1660,60 +2685,43 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault()
     openNewForm()
   }
+
+  if (viewMode === 'list') {
+    if (e.key === 'ArrowRight') { e.preventDefault(); moveCardFocus(1, 0) }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); moveCardFocus(-1, 0) }
+    if (e.key === 'ArrowDown')  { e.preventDefault(); moveCardFocus(0, 1) }
+    if (e.key === 'ArrowUp')    { e.preventDefault(); moveCardFocus(0, -1) }
+    if (e.key === 'j') moveCardFocus(1, 0)
+    if (e.key === 'k') moveCardFocus(-1, 0)
+  }
 })
-
-// ── Helpers ──
-
-function formatDate(isoStr) {
-  try {
-    const d = new Date(isoStr)
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-  } catch { return '' }
-}
 
 // ── Init ──
 
 async function init() {
   try {
-    await loadEntries()
+    await loadFirstPage()
   } catch (err) {
     console.warn('[knowledge] init error:', err)
+    render()
   }
   loadingEl.remove()
-  render()
 }
 
-// Reload when workspace changes
 runtime.on('workspace:changed', async () => {
   entries = []
   activeTag = ''
   activeType = ''
   searchQuery = ''
+  searchResults = null
   openDetailId = null
   overlayEl.style.display = 'none'
   newOverlayEl.style.display = 'none'
-  contentEl.innerHTML = ''
-  const loader = document.createElement('div')
-  loader.className = 'loading'
-  loader.textContent = 'Loading...'
-  contentEl.appendChild(loader)
-  try {
-    await loadEntries()
-  } catch (err) {
-    console.warn('[knowledge] reload error:', err)
-  }
-  loader.remove()
-  render()
+  try { await loadFirstPage() } catch (err) { console.warn('[knowledge] reload error:', err) }
 })
 
-// Reload when a core app is enabled/disabled elsewhere (mim.yaml flag changed; enable also creates the folder).
 runtime.on('apps:changed', async () => {
-  try {
-    await loadEntries()
-  } catch (err) {
-    console.warn('[knowledge] apps:changed reload error:', err)
-  }
-  render()
+  try { await loadFirstPage() } catch (err) { console.warn('[knowledge] apps:changed reload error:', err) }
 })
 
 init()
