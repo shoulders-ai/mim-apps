@@ -1,6 +1,6 @@
 import { state, render } from './state.js'
 import { icon } from './icons.js'
-import { escapeAttr, escapeHtml, qs } from './utils.js'
+import { escapeAttr, escapeHtml, qs, relativeTime } from './utils.js'
 
 function viewToggle() {
   const board = state.view === 'board'
@@ -58,6 +58,12 @@ function sortSelect() {
   ).join('')}</select>`
 }
 
+function reminderBell() {
+  const count = state.firedReminders.length
+  const badge = count > 0 ? `<span class="bell-badge">${count}</span>` : ''
+  return `<button class="tab-btn${state.reminderPanelOpen ? ' active' : ''}${count > 0 ? ' has-reminders' : ''}" data-action="toggle-reminders" title="Reminders">${icon('bell', 13)}${badge}</button>`
+}
+
 export function renderToolbar() {
   const container = qs('#toolbar')
   if (!container) return
@@ -87,6 +93,7 @@ export function renderToolbar() {
         <span class="header-title">Board</span>
       </div>
       <div class="header-right">
+        ${reminderBell()}
         <button class="header-btn" data-action="new-issue" title="New issue (C)">${icon('plus', 13)}</button>
       </div>
     </div>
@@ -109,4 +116,34 @@ export function renderToolbar() {
         <button class="tab-btn${state.settingsOpen ? ' active' : ''}" data-action="toggle-settings" title="Display settings">${icon('sliders', 13)}</button>
       </div>
     </div>`
+}
+
+export function renderReminderPanel() {
+  const container = qs('#reminderLayer')
+  if (!container) return
+  if (!state.reminderPanelOpen || state.firedReminders.length === 0) {
+    container.innerHTML = ''
+    return
+  }
+
+  const items = state.firedReminders.map(r => {
+    return `<div class="reminder-item">
+      <div class="reminder-title" data-action="open-detail" data-id="${escapeAttr(r.id)}">${escapeHtml(r.title || '(untitled)')}</div>
+      <div class="reminder-meta">${icon('clock', 10)} Set ${escapeHtml(relativeTime(r.remindAt))}</div>
+      <div class="reminder-actions">
+        <button class="reminder-btn" data-action="dismiss-reminder" data-id="${escapeAttr(r.id)}">Dismiss</button>
+        <button class="reminder-btn" data-action="snooze-reminder" data-id="${escapeAttr(r.id)}" data-hours="1">+1h</button>
+        <button class="reminder-btn" data-action="snooze-reminder" data-id="${escapeAttr(r.id)}" data-hours="3">+3h</button>
+        <button class="reminder-btn" data-action="snooze-reminder" data-id="${escapeAttr(r.id)}" data-hours="24">+1d</button>
+      </div>
+    </div>`
+  }).join('')
+
+  container.innerHTML = `<div class="reminder-panel">
+    <div class="reminder-panel-head">
+      <span>Reminders</span>
+      <button class="reminder-dismiss-all" data-action="dismiss-all-reminders">Dismiss all</button>
+    </div>
+    ${items}
+  </div>`
 }

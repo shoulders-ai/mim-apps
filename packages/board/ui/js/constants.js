@@ -1,11 +1,13 @@
-export const STATUSES = ['backlog', 'plan', 'in-progress', 'review', 'done']
+export const STATUSES = ['backlog', 'plan', 'in-progress', 'waiting', 'review', 'done', 'cancelled']
 
 export const STATUS_LABELS = {
-  'backlog': 'Backlog',
-  'plan': 'Plan',
+  'backlog': 'Inbox',
+  'plan': 'To Do',
   'in-progress': 'In Progress',
+  'waiting': 'Waiting',
   'review': 'Review',
   'done': 'Done',
+  'cancelled': 'Cancelled',
 }
 
 export const PRIORITIES = ['urgent', 'high', 'normal', 'low']
@@ -31,7 +33,9 @@ export const LABEL_COLOR_VALUES = {
   orange: '#e8853d',
 }
 
-export const STATUS_ALIAS = { todo: 'backlog' }
+export const STATUS_ALIAS = { todo: 'plan', inbox: 'backlog' }
 export const PRIORITY_ALIAS = { critical: 'urgent', medium: 'normal', none: 'normal' }
 
-export const LIST_GROUP_ORDER = ['plan', 'backlog', 'in-progress', 'review', 'done']
+export const DEFAULT_COLUMNS = ['backlog', 'plan', 'in-progress', 'done']
+
+export const LIST_GROUP_ORDER = ['plan', 'backlog', 'in-progress', 'waiting', 'review', 'done', 'cancelled']

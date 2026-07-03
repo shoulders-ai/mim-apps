@@ -62,9 +62,10 @@ function dateChip(issue) {
 
 function issueCard(issue) {
   const isDone = issue.status === 'done'
+  const isCancelled = issue.status === 'cancelled'
   const isDragging = state.dragId === issue.id
   let cls = 'card'
-  if (isDone) cls += ' card-done'
+  if (isDone || isCancelled) cls += ' card-done'
   if (isDragging) cls += ' dragging'
 
   const assigneeHTML = state.displayProps.has('assignee') && issue.assignee
@@ -171,7 +172,16 @@ export function renderBoard() {
     const groups = getProjectGroups()
     return `<div class="board">${groups.map(projectColumnHTML).join('')}</div>`
   }
-  return `<div class="board">${STATUSES.map(statusColumnHTML).join('')}</div>`
+  const visibleStatuses = STATUSES.filter(s => state.enabledColumns.has(s))
+  return `<div class="board">${visibleStatuses.map(statusColumnHTML).join('')}</div>`
+}
+
+function preserveBoardScroll(fn) {
+  const board = qs('.board')
+  const scrollLeft = board ? board.scrollLeft : 0
+  fn()
+  const after = qs('.board')
+  if (after) after.scrollLeft = scrollLeft
 }
 
 export function initBoardDrag() {
@@ -181,7 +191,7 @@ export function initBoardDrag() {
     state.dragId = card.dataset.id
     e.dataTransfer.setData('text/plain', card.dataset.id)
     e.dataTransfer.effectAllowed = 'move'
-    requestAnimationFrame(() => render())
+    requestAnimationFrame(() => card.classList.add('dragging'))
   })
 
   document.addEventListener('dragover', (e) => {
@@ -204,23 +214,23 @@ export function initBoardDrag() {
     e.preventDefault()
     const issue = findIssue(state.dragId)
     state.dragId = null
-    if (!issue) { render(); return }
+    if (!issue) { preserveBoardScroll(() => render()); return }
     await ensureBody(issue)
     if (col.dataset.dropProject !== undefined) {
       issue.project = col.dataset.dropProject
     } else {
       const newStatus = col.dataset.dropStatus || col.dataset.status
-      if (!newStatus) { render(); return }
+      if (!newStatus) { preserveBoardScroll(() => render()); return }
       issue.status = newStatus
     }
-    render()
+    preserveBoardScroll(() => render())
     await saveIssue(issue)
-    render()
+    preserveBoardScroll(() => render())
   })
 
   document.addEventListener('dragend', () => {
     state.dragId = null
     document.querySelectorAll('.col-drop-active').forEach(el => el.classList.remove('col-drop-active'))
-    render()
+    document.querySelectorAll('.card.dragging').forEach(el => el.classList.remove('dragging'))
   })
 }

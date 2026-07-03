@@ -8,10 +8,14 @@ export function statusToken(status) {
   switch (status) {
     case 'done':
       return '<span class="status-token status-done"></span>'
+    case 'cancelled':
+      return '<span class="status-token status-cancelled"></span>'
     case 'review':
       return '<span class="status-token status-review"></span>'
     case 'in-progress':
       return '<span class="status-token status-progress"></span>'
+    case 'waiting':
+      return '<span class="status-token status-waiting"></span>'
     case 'plan':
       return '<span class="status-token status-plan"></span>'
     default:
@@ -49,4 +53,6 @@ export const SVG_DEFS = `
   <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none"></circle><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"></circle><circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none"></circle></symbol>
   <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"></path></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></symbol>
 </svg>`

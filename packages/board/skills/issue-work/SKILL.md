@@ -22,7 +22,7 @@ Use issues when the user asks to:
 | Field | Type | Values / Notes |
 |-------|------|----------------|
 | `title` | string | Required. Short, actionable. |
-| `status` | enum | `backlog`, `plan`, `in-progress`, `review`, `done` |
+| `status` | enum | `backlog` (Inbox), `plan` (To Do), `in-progress`, `waiting`, `review`, `done`, `cancelled` |
 | `priority` | enum | `low`, `normal`, `high`, `urgent` |
 | `labels` | array | Each label: `{name, color}`. Colors: `gray`, `green`, `yellow`, `blue`, `purple`, `red`, `orange`. Replaces legacy `tags`. |
 | `project` | string | Groups related issues. Free text, e.g. "Website redesign". |
@@ -30,6 +30,7 @@ Use issues when the user asks to:
 | `dueDate` | string | ISO date, e.g. "2026-07-01". |
 | `waitingFor` | string | What blocks progress. |
 | `snoozeUntil` | string | ISO timestamp. Hide until this time. |
+| `remindAt` | string | ISO timestamp. Trigger a reminder at this time. |
 | `deliverables` | array | Each: `{path, label?}`. Files this issue produces. |
 | `body` | string | Markdown. Objective, plan, decisions, blockers, next action. |
 

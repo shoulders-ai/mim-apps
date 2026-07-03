@@ -5,14 +5,14 @@ import { renderDetail, initDetailListeners, openDetail, closeDetail, handleDelet
 import { makeNewIssueDraft } from './createDraft.js'
 import { renderCreateModal, handleCreateIssue, initCreateListeners, syncCreateDraftFromDom } from './create.js'
 import { renderFieldMenu, handleFieldSelect, openFieldMenu, initFieldMenuListeners, handleLabelColorChange, commitFieldMenuTextInput } from './fields.js'
-import { renderSettings, handleToggleProp } from './settings.js'
-import { renderToolbar } from './toolbar.js'
+import { renderSettings, handleToggleProp, handleToggleColumn } from './settings.js'
+import { renderToolbar, renderReminderPanel } from './toolbar.js'
 import { renderToast } from './toast.js'
 import { initShortcuts } from './shortcuts.js'
-import { loadIssues, loadUserName, enableBoard, onWorkspaceChanged } from './data.js'
+import { loadIssues, loadUserName, loadColumnConfig, enableBoard, onWorkspaceChanged, saveIssue, checkReminders } from './data.js'
 import { SVG_DEFS } from './icons.js'
 import { qs } from './utils.js'
-import { showToast } from './state.js'
+import { showToast, findIssue } from './state.js'
 
 function renderOffer() {
   return `<div class="offer">
@@ -45,6 +45,7 @@ function renderAll() {
   renderPage()
   renderSettings()
   renderFieldMenu()
+  renderReminderPanel()
   renderToast()
 
   const modalLayer = qs('#modalLayer')
@@ -61,6 +62,10 @@ function handleClick(e) {
     }
     if (state.settingsOpen && !e.target.closest('.settings-popover') && !e.target.closest('[data-action="toggle-settings"]')) {
       state.settingsOpen = false
+      changed = true
+    }
+    if (state.reminderPanelOpen && !e.target.closest('.reminder-panel') && !e.target.closest('[data-action="toggle-reminders"]')) {
+      state.reminderPanelOpen = false
       changed = true
     }
     if (state.deleteConfirmId) {
@@ -115,6 +120,56 @@ function handleClick(e) {
   if (action === 'toggle-settings') {
     state.settingsOpen = !state.settingsOpen
     state.fieldMenu = null
+    state.reminderPanelOpen = false
+    render()
+    return
+  }
+
+  if (action === 'toggle-reminders') {
+    state.reminderPanelOpen = !state.reminderPanelOpen
+    state.settingsOpen = false
+    state.fieldMenu = null
+    render()
+    return
+  }
+
+  if (action === 'dismiss-reminder') {
+    const issue = findIssue(target.dataset.id)
+    if (issue) {
+      issue.remindAt = ''
+      saveIssue(issue)
+    }
+    state.firedReminders = state.firedReminders.filter(r => r.id !== target.dataset.id)
+    if (state.firedReminders.length === 0) state.reminderPanelOpen = false
+    render()
+    return
+  }
+
+  if (action === 'snooze-reminder') {
+    const issue = findIssue(target.dataset.id)
+    const hours = parseInt(target.dataset.hours, 10) || 1
+    if (issue) {
+      issue.remindAt = new Date(Date.now() + hours * 3600000).toISOString()
+      saveIssue(issue)
+    }
+    state.firedReminders = state.firedReminders.filter(r => r.id !== target.dataset.id)
+    if (state.firedReminders.length === 0) state.reminderPanelOpen = false
+    showToast(`Snoozed ${hours}h`)
+    render()
+    return
+  }
+
+  if (action === 'dismiss-all-reminders') {
+    for (const r of state.firedReminders) {
+      const issue = findIssue(r.id)
+      if (issue) {
+        issue.remindAt = ''
+        saveIssue(issue)
+      }
+    }
+    state.firedReminders = []
+    state.reminderPanelOpen = false
+    showToast('All reminders dismissed')
     render()
     return
   }
@@ -210,6 +265,11 @@ function handleClick(e) {
     return
   }
 
+  if (action === 'toggle-column') {
+    handleToggleColumn(target.dataset.col)
+    return
+  }
+
   if (action === 'enable-board') {
     target.disabled = true
     enableBoard().catch(err => {
@@ -231,6 +291,8 @@ function handleInput(e) {
   }
   if (e.target.id === 'createBody') {
     state.newIssue.body = e.target.value
+    e.target.style.height = 'auto'
+    e.target.style.height = e.target.scrollHeight + 'px'
     return
   }
   if (e.target.id === 'nameInput') {
@@ -270,6 +332,7 @@ export async function init() {
     <section id="content"><div class="loading">Loading...</div></section>
     <div id="settingsLayer"></div>
     <div id="fieldMenuLayer"></div>
+    <div id="reminderLayer"></div>
     <div id="toastLayer"></div>
     <div id="modalLayer"></div>
     <div class="kbd-hint"><kbd>C</kbd> create <kbd>/</kbd> search <kbd>B</kbd> board <kbd>L</kbd> list</div>`
@@ -286,12 +349,18 @@ export async function init() {
   document.addEventListener('change', handleChange)
 
   try {
-    await Promise.all([loadIssues(), loadUserName()])
+    await Promise.all([loadIssues(), loadUserName(), loadColumnConfig()])
   } catch (err) {
     console.warn('[board] init error:', err)
   }
 
+  checkReminders()
   render()
+
+  setInterval(() => {
+    checkReminders()
+    render()
+  }, 60000)
 
   onWorkspaceChanged(async () => {
     try {
@@ -299,6 +368,7 @@ export async function init() {
     } catch (err) {
       console.warn('[board] reload error:', err)
     }
+    checkReminders()
     render()
   })
 }

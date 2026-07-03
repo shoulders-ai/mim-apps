@@ -1,4 +1,4 @@
-export const STATUSES = ['backlog', 'plan', 'in-progress', 'review', 'done']
+export const STATUSES = ['backlog', 'plan', 'in-progress', 'waiting', 'review', 'done', 'cancelled']
 export const PRIORITIES = ['low', 'normal', 'high', 'urgent']
 export const LABEL_COLORS = ['gray', 'green', 'yellow', 'blue', 'purple', 'red', 'orange']
 
@@ -33,6 +33,7 @@ const issueFieldsSchema = {
   },
   waitingFor: { type: 'string' },
   snoozeUntil: { type: 'string' },
+  remindAt: { type: 'string' },
   deliverables: deliverableSchema,
   body: { type: 'string' },
 }
@@ -213,6 +214,7 @@ export function parseIssue(id, raw) {
   if (typeof meta.dueDate === 'string') issue.dueDate = meta.dueDate
   if (typeof meta.waiting_for === 'string') issue.waitingFor = meta.waiting_for
   if (typeof meta.snooze_until === 'string') issue.snoozeUntil = meta.snooze_until
+  if (typeof meta.remind_at === 'string') issue.remindAt = meta.remind_at
   return issue
 }
 
@@ -239,6 +241,7 @@ export function serializeIssue(issue) {
   }
   if (issue.waitingFor !== undefined) lines.push(`waiting_for: ${yamlScalar(issue.waitingFor)}`)
   if (issue.snoozeUntil !== undefined) lines.push(`snooze_until: ${yamlScalar(issue.snoozeUntil)}`)
+  if (issue.remindAt !== undefined) lines.push(`remind_at: ${yamlScalar(issue.remindAt)}`)
   if (Array.isArray(issue.deliverables) && issue.deliverables.length > 0) {
     lines.push('deliverables:')
     for (const deliverable of issue.deliverables) {
@@ -343,6 +346,7 @@ export async function createIssue(ctx, input = {}) {
   if (input.dueDate !== undefined) issue.dueDate = input.dueDate
   if (input.waitingFor !== undefined) issue.waitingFor = input.waitingFor
   if (input.snoozeUntil !== undefined) issue.snoozeUntil = input.snoozeUntil
+  if (input.remindAt !== undefined) issue.remindAt = input.remindAt
 
   for (let attempt = 0; attempt < 5; attempt++) {
     issue.id = newIssueId()

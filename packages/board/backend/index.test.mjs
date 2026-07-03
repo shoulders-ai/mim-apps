@@ -62,7 +62,7 @@ function hasIssuesFolder(store) {
 
 describe('board package issue model', () => {
   it('exports the authoritative issue enums', () => {
-    expect(STATUSES).toEqual(['backlog', 'plan', 'in-progress', 'review', 'done'])
+    expect(STATUSES).toEqual(['backlog', 'plan', 'in-progress', 'waiting', 'review', 'done', 'cancelled'])
     expect(PRIORITIES).toEqual(['low', 'normal', 'high', 'urgent'])
     expect(LABEL_COLORS).toEqual(['gray', 'green', 'yellow', 'blue', 'purple', 'red', 'orange'])
   })
@@ -83,6 +83,7 @@ describe('board package issue model', () => {
       ],
       waitingFor: 'design review',
       snoozeUntil: '2026-05-30',
+      remindAt: '2026-05-29T09:00:00.000Z',
       deliverables: [
         { path: 'docs/spec.md', label: 'Spec' },
         { path: 'src/feature.ts' },
@@ -94,6 +95,7 @@ describe('board package issue model', () => {
     const serialized = serializeIssue(issue)
     expect(serialized).toContain('waiting_for:')
     expect(serialized).toContain('snooze_until:')
+    expect(serialized).toContain('remind_at:')
     expect(serialized).toContain('dueDate:')
     expect(serialized).toContain('project:')
     expect(serialized).toContain('assignee:')

@@ -114,5 +114,6 @@ export function renderList() {
     const groups = getProjectGroups()
     return `<div class="list-view">${groups.map(projectGroupHTML).join('')}</div>`
   }
-  return `<div class="list-view">${LIST_GROUP_ORDER.map(statusGroupHTML).join('')}</div>`
+  const visibleStatuses = LIST_GROUP_ORDER.filter(s => state.enabledColumns.has(s))
+  return `<div class="list-view">${visibleStatuses.map(statusGroupHTML).join('')}</div>`
 }

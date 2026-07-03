@@ -1,5 +1,5 @@
 import { runtime } from '/sdk/mim.js'
-import { STATUSES, PRIORITIES, STATUS_ALIAS, PRIORITY_ALIAS } from './constants.js'
+import { STATUSES, PRIORITIES, STATUS_ALIAS, PRIORITY_ALIAS, DEFAULT_COLUMNS } from './constants.js'
 import { state, render, showToast } from './state.js'
 
 function normStatus(s) {
@@ -36,6 +36,7 @@ function normIssue(raw) {
     project: raw.project || '',
     assignee: raw.assignee || '',
     dueDate: raw.dueDate || '',
+    remindAt: raw.remindAt || '',
     created: raw.created || '',
     updated: raw.updated || '',
     body: typeof raw.body === 'string' ? raw.body : undefined,
@@ -69,8 +70,25 @@ export async function saveUserName(name) {
   } catch {}
 }
 
+export async function loadColumnConfig() {
+  try {
+    const stored = await runtime.data.kv.get('enabledColumns')
+    if (Array.isArray(stored) && stored.length > 0) {
+      state.enabledColumns = new Set(stored)
+      return
+    }
+  } catch {}
+  state.enabledColumns = new Set(DEFAULT_COLUMNS)
+}
+
+export async function saveColumnConfig() {
+  try {
+    await runtime.data.kv.set('enabledColumns', [...state.enabledColumns])
+  } catch {}
+}
+
 export async function saveIssue(issue) {
-  const result = await runtime.call('issues.update', {
+  const payload = {
     id: issue.id,
     title: issue.title,
     status: issue.status,
@@ -79,8 +97,10 @@ export async function saveIssue(issue) {
     project: issue.project,
     assignee: issue.assignee,
     dueDate: issue.dueDate || undefined,
+    remindAt: issue.remindAt || undefined,
     body: issue.body || '',
-  })
+  }
+  const result = await runtime.call('issues.update', payload)
   if (result?.folderPresent === false) { state.folderPresent = false; return }
   if (result?.id) {
     const merged = normIssue(result)
@@ -139,4 +159,17 @@ export async function enableBoard() {
 export function onWorkspaceChanged(fn) {
   runtime.on('workspace:changed', fn)
   runtime.on('apps:changed', fn)
+}
+
+export function checkReminders() {
+  const now = new Date()
+  const fired = []
+  for (const issue of state.issues) {
+    if (!issue.remindAt) continue
+    if (issue.status === 'done' || issue.status === 'cancelled') continue
+    if (new Date(issue.remindAt) <= now) {
+      fired.push({ id: issue.id, title: issue.title, remindAt: issue.remindAt })
+    }
+  }
+  state.firedReminders = fired
 }

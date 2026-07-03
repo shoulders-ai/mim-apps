@@ -1,4 +1,5 @@
 import { makeNewIssueDraft } from './createDraft.js'
+import { DEFAULT_COLUMNS } from './constants.js'
 
 let _render = () => {}
 
@@ -31,6 +32,11 @@ export const state = {
   createSubmitting: false,
 
   displayProps: new Set(['priority', 'labels', 'dueDate', 'assignee']),
+
+  enabledColumns: new Set(DEFAULT_COLUMNS),
+
+  firedReminders: [],
+  reminderPanelOpen: false,
 }
 
 export function setRenderFn(fn) {
@@ -58,6 +64,11 @@ export function findIssue(id) {
 export function closeTopLayer() {
   if (state.fieldMenu) {
     state.fieldMenu = null
+    render()
+    return true
+  }
+  if (state.reminderPanelOpen) {
+    state.reminderPanelOpen = false
     render()
     return true
   }

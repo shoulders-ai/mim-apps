@@ -1,4 +1,7 @@
 import { state, render } from './state.js'
+import { STATUSES, STATUS_LABELS } from './constants.js'
+import { statusToken } from './icons.js'
+import { saveColumnConfig } from './data.js'
 import { qs } from './utils.js'
 
 const DISPLAY_PROPS = [
@@ -17,6 +20,13 @@ function propChips() {
   }).join('')
 }
 
+function columnChips() {
+  return STATUSES.map(s => {
+    const active = state.enabledColumns.has(s)
+    return `<button class="prop-chip${active ? ' active' : ''}" data-action="toggle-column" data-col="${s}">${statusToken(s)} ${STATUS_LABELS[s]}</button>`
+  }).join('')
+}
+
 export function renderSettings() {
   const container = qs('#settingsLayer')
   if (!container) return
@@ -26,6 +36,9 @@ export function renderSettings() {
   }
 
   container.innerHTML = `<div class="settings-popover">
+    <div class="settings-subhead">Columns</div>
+    <div class="chip-list">${columnChips()}</div>
+    <div class="settings-sep"></div>
     <div class="settings-subhead">Display properties</div>
     <div class="chip-list">${propChips()}</div>
   </div>`
@@ -37,5 +50,16 @@ export function handleToggleProp(key) {
   } else {
     state.displayProps.add(key)
   }
+  render()
+}
+
+export function handleToggleColumn(col) {
+  if (state.enabledColumns.has(col)) {
+    if (state.enabledColumns.size <= 2) return
+    state.enabledColumns.delete(col)
+  } else {
+    state.enabledColumns.add(col)
+  }
+  saveColumnConfig()
   render()
 }

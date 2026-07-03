@@ -7,7 +7,7 @@ import { escapeAttr, escapeHtml, qs } from './utils.js'
 
 export function openFieldMenu(trigger, field, issueId, isNew = false) {
   const rect = trigger.getBoundingClientRect()
-  const width = 220
+  const width = field === 'priority' ? 180 : 220
   const x = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))
   const y = Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 300))
   state.fieldMenu = { field, issueId, isNew, x, y }
@@ -35,6 +35,7 @@ function currentValue(field, issueId, isNew) {
     case 'project': return issue.project
     case 'labels': return issue.labels
     case 'dueDate': return issue.dueDate
+    case 'remindAt': return issue.remindAt
     default: return ''
   }
 }
@@ -49,15 +50,18 @@ function menuItem(field, value, label, visual, selected, issueId, isNew) {
 }
 
 function statusMenuItems(current, issueId, isNew) {
-  return STATUSES.map(s =>
+  const cols = state.enabledColumns
+  const visible = STATUSES.filter(s => cols.has(s) || s === current)
+  return visible.map(s =>
     menuItem('status', s, STATUS_LABELS[s], statusToken(s), s === current, issueId, isNew)
   ).join('')
 }
 
 function priorityMenuItems(current, issueId, isNew) {
-  return PRIORITIES.map(p =>
-    menuItem('priority', p, PRIORITY_LABELS[p], `<span class="fm-priority">${priorityBars(p)}</span>`, p === current, issueId, isNew)
-  ).join('')
+  return `<div class="fm-priority-row">${PRIORITIES.map(p => {
+    const cls = p === current ? 'fm-priority-opt selected' : 'fm-priority-opt'
+    return `<button class="${cls}" data-action="select-field" data-field="priority" data-value="${p}" data-id="${escapeAttr(issueId || '')}" data-new="${isNew ? '1' : '0'}" title="${PRIORITY_LABELS[p]}">${priorityBars(p)}<span class="fm-priority-label">${PRIORITY_LABELS[p]}</span></button>`
+  }).join('')}</div>`
 }
 
 function assigneeMenuItems(current, issueId, isNew) {
@@ -137,6 +141,33 @@ function dueDateMenuItems(current, issueId, isNew) {
   return items.join('')
 }
 
+function remindAtMenuItems(current, issueId) {
+  const items = []
+  items.push(menuItem('remindAt', '', 'No reminder',
+    '<span class="fm-icon-muted">–</span>', !current, issueId, false))
+  const now = new Date()
+  const offsets = [
+    { label: 'In 1 hour', hours: 1 },
+    { label: 'In 3 hours', hours: 3 },
+    { label: 'Tomorrow morning', hours: null, tomorrow: true },
+    { label: 'In 2 days', hours: 48 },
+    { label: 'In 1 week', hours: 168 },
+  ]
+  for (const { label, hours, tomorrow } of offsets) {
+    let d
+    if (tomorrow) {
+      d = new Date(now)
+      d.setDate(d.getDate() + 1)
+      d.setHours(9, 0, 0, 0)
+    } else {
+      d = new Date(now.getTime() + hours * 3600000)
+    }
+    const val = d.toISOString()
+    items.push(menuItem('remindAt', val, label, icon('clock', 12), false, issueId, false))
+  }
+  return items.join('')
+}
+
 export function renderFieldMenu() {
   const container = qs('#fieldMenuLayer')
   if (!container) return
@@ -147,16 +178,18 @@ export function renderFieldMenu() {
 
   let title = 'Set property'
   let rows = ''
+  let width = 220
   switch (field) {
     case 'status': title = 'Status'; rows = statusMenuItems(cv, issueId, isNew); break
-    case 'priority': title = 'Priority'; rows = priorityMenuItems(cv, issueId, isNew); break
+    case 'priority': title = 'Priority'; rows = priorityMenuItems(cv, issueId, isNew); width = 180; break
     case 'assignee': title = 'Assignee'; rows = assigneeMenuItems(cv, issueId, isNew); break
     case 'project': title = 'Project'; rows = projectMenuItems(cv, issueId, isNew); break
     case 'labels': title = 'Labels'; rows = labelMenuItems(cv, issueId, isNew); break
     case 'dueDate': title = 'Due date'; rows = dueDateMenuItems(cv, issueId, isNew); break
+    case 'remindAt': title = 'Remind me'; rows = remindAtMenuItems(cv, issueId); break
   }
 
-  container.innerHTML = `<div class="field-menu" style="left:${x}px;top:${y}px;">
+  container.innerHTML = `<div class="field-menu" style="left:${x}px;top:${y}px;width:${width}px">
     <div class="fm-title">${title}</div>
     ${rows}
   </div>`
@@ -194,6 +227,12 @@ export function handleFieldSelect(target) {
     if (field === 'assignee') issue.assignee = value
     if (field === 'project') issue.project = value
     if (field === 'dueDate') issue.dueDate = value
+    if (field === 'remindAt') {
+      issue.remindAt = value
+      if (!value) {
+        state.firedReminders = state.firedReminders.filter(r => r.id !== id)
+      }
+    }
     if (field === 'labels') {
       if (!value) {
         issue.labels = []

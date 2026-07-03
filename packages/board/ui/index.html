@@ -461,6 +461,28 @@
       transform: rotate(-45deg);
       margin-top: -1px;
     }
+    .status-waiting {
+      border: 1.5px solid var(--color-ink-3);
+    }
+    .status-waiting::before {
+      content: "";
+      width: 3px; height: 5px;
+      border-left: 1.5px solid var(--color-ink-3);
+      border-right: 1.5px solid var(--color-ink-3);
+    }
+    .status-cancelled {
+      border: 1.5px solid var(--color-ink-4);
+      background: var(--color-ink-4);
+      opacity: .6;
+    }
+    .status-cancelled::before {
+      content: "";
+      width: 5px; height: 5px;
+      position: relative;
+      background:
+        linear-gradient(45deg, transparent 40%, var(--color-surface) 40%, var(--color-surface) 60%, transparent 60%),
+        linear-gradient(-45deg, transparent 40%, var(--color-surface) 40%, var(--color-surface) 60%, transparent 60%);
+    }
 
     /* ── Priority Bars ── */
     .priority-bars {
@@ -562,7 +584,6 @@
     .field-menu {
       position: fixed;
       z-index: 95;
-      width: 220px;
       padding: 5px;
       background: var(--color-surface);
       border: 1px solid var(--color-rule);
@@ -821,17 +842,20 @@
     .detail-textarea {
       display: block;
       width: 100%;
-      min-height: 100px;
-      resize: vertical;
+      min-height: 200px;
+      resize: none;
       border: 1px solid var(--color-rule-light);
-      border-radius: 5px;
-      padding: 8px;
+      border-radius: 7px;
+      padding: 12px 14px;
       font-family: var(--font-sans);
       font-size: 13px;
-      line-height: 1.6;
+      line-height: 1.65;
       color: var(--color-ink);
       background: var(--color-surface);
       outline: none;
+    }
+    .detail-textarea.auto-grow {
+      overflow: hidden;
     }
     .detail-textarea:focus { border-color: var(--color-accent); }
     .detail-textarea::placeholder { color: var(--color-ink-4); }
@@ -987,17 +1011,20 @@
     .create-desc {
       color: var(--color-ink);
       width: 100%;
-      min-height: 38px;
-      padding: 0;
-      border: none;
+      min-height: 60px;
+      padding: 8px 10px;
+      border: 1px solid var(--color-rule-light);
+      border-radius: 7px;
       outline: none;
       resize: none;
-      background: transparent;
+      overflow: hidden;
+      background: var(--color-surface);
       font-family: var(--font-sans);
       font-size: 13px;
-      line-height: 1.35;
+      line-height: 1.5;
       margin-bottom: 14px;
     }
+    .create-desc:focus { border-color: var(--color-accent); }
     .create-desc::placeholder { color: var(--color-ink-4); }
     .create-chips {
       display: flex;
@@ -1135,6 +1162,121 @@
       font-family: var(--font-mono);
       font-size: 8px;
     }
+
+    /* ── Compact Priority Selector ── */
+    .fm-priority-row {
+      display: flex;
+      gap: 2px;
+      padding: 4px 4px 6px;
+    }
+    .fm-priority-opt {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 6px 4px 4px;
+      border-radius: 6px;
+      border: 1.5px solid transparent;
+    }
+    .fm-priority-opt:hover { background: var(--color-chrome-mid); }
+    .fm-priority-opt.selected {
+      border-color: var(--color-accent);
+      background: var(--color-accent-soft);
+    }
+    .fm-priority-label {
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--color-ink-3);
+    }
+    .fm-priority-opt.selected .fm-priority-label { color: var(--color-accent); }
+
+    /* ── Bell Badge ── */
+    .tab-btn { position: relative; }
+    .bell-badge {
+      position: absolute;
+      top: 1px;
+      right: 1px;
+      min-width: 12px;
+      height: 12px;
+      padding: 0 3px;
+      border-radius: 6px;
+      background: var(--color-rem, #c0392b);
+      color: #fff;
+      font-size: 8px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .tab-btn.has-reminders { color: var(--color-rem, #c0392b); }
+
+    /* ── Reminder Panel ── */
+    .reminder-panel {
+      position: absolute;
+      top: 0;
+      right: 44px;
+      width: 300px;
+      z-index: 35;
+      background: var(--color-surface);
+      border: 1px solid var(--color-rule);
+      border-radius: 9px;
+      box-shadow: 0 12px 36px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.05);
+      overflow: hidden;
+    }
+    .reminder-panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--color-ink-3);
+      border-bottom: 1px solid var(--color-rule-light);
+    }
+    .reminder-dismiss-all {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--color-ink-4);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .reminder-dismiss-all:hover { background: var(--color-chrome-mid); color: var(--color-ink-3); }
+    .reminder-item {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--color-rule-light);
+    }
+    .reminder-item:last-child { border-bottom: none; }
+    .reminder-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-ink);
+      margin-bottom: 3px;
+    }
+    .reminder-title:hover { color: var(--color-accent); }
+    .reminder-meta {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 10px;
+      color: var(--color-ink-4);
+      margin-bottom: 6px;
+    }
+    .reminder-actions {
+      display: flex;
+      gap: 4px;
+    }
+    .reminder-btn {
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--color-ink-3);
+      border: 1px solid var(--color-rule-light);
+    }
+    .reminder-btn:hover { background: var(--color-chrome-mid); color: var(--color-ink-2); }
   </style>
 </head>
 <body>

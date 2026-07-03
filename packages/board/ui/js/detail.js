@@ -33,6 +33,12 @@ export function flushDetailSave() {
   saveIssue(issue)
 }
 
+function autoGrow(el) {
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = el.scrollHeight + 'px'
+}
+
 export function openDetail(id) {
   flushDetailSave()
   state.detailIssueId = id
@@ -48,7 +54,10 @@ export function openDetail(id) {
     if (state.detailIssueId !== id) return
     if (detailEditVersion !== loadVersion) return
     const bodyEl = qs('#detailBody')
-    if (bodyEl) bodyEl.value = issue.body || ''
+    if (bodyEl) {
+      bodyEl.value = issue.body || ''
+      autoGrow(bodyEl)
+    }
   })
 }
 
@@ -64,6 +73,18 @@ function propRow(issue, field, label, visual) {
     ${visual}
     <span>${label}</span>
   </button>`
+}
+
+function formatReminder(isoStr) {
+  if (!isoStr) return ''
+  const d = new Date(isoStr)
+  const now = new Date()
+  if (d <= now) return 'Overdue'
+  const diffH = Math.round((d - now) / 3600000)
+  if (diffH < 1) return 'In < 1 hour'
+  if (diffH < 24) return `In ${diffH}h`
+  const diffD = Math.round(diffH / 24)
+  return `In ${diffD}d`
 }
 
 export function renderDetail() {
@@ -88,14 +109,17 @@ export function renderDetail() {
 
   const projectLabel = issue.project || 'No project'
 
+  const reminderLabel = issue.remindAt
+    ? `<span>${escapeHtml(formatReminder(issue.remindAt))}</span>`
+    : '<span class="prop-muted">No reminder</span>'
+
   return `<div class="detail-layout">
     <div class="detail-center">
     <article class="detail-main">
       <input class="detail-title" id="detailTitle" type="text" value="${escapeAttr(issue.title || '')}" placeholder="Issue title...">
 
       <div class="detail-section">
-        <div class="detail-label">Description</div>
-        <textarea class="detail-textarea" id="detailBody" placeholder="Add a description...">${escapeHtml(issue.body || '')}</textarea>
+        <textarea class="detail-textarea auto-grow" id="detailBody" placeholder="Add a description...">${escapeHtml(issue.body || '')}</textarea>
       </div>
 
       <div class="detail-section">
@@ -130,6 +154,11 @@ export function renderDetail() {
       </div>
 
       <div class="prop-card">
+        <div class="prop-card-title">Reminder</div>
+        ${propRow(issue, 'remindAt', reminderLabel, icon('bell', 14))}
+      </div>
+
+      <div class="prop-card">
         <div class="detail-meta">
           <span>ID: ${escapeHtml(issue.id)}</span>
           <span>Created ${escapeHtml(formatDate(issue.created))}</span>
@@ -157,6 +186,7 @@ export function initDetailListeners() {
         issue.body = e.target.value
         detailEditVersion += 1
       }
+      autoGrow(e.target)
       scheduleDetailSave()
     }
   })
@@ -169,7 +199,7 @@ export async function handleDeleteIssue(id) {
     return
   }
   state.deleteConfirmId = null
-  flushDetailSave()
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null }
   state.detailIssueId = null
   state.page = 'project'
   await deleteIssue(id)
