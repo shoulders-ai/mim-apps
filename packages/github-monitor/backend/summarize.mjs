@@ -154,6 +154,29 @@ export function reportPath(meta) {
   return `reports/github/${day}-${slug}.md`
 }
 
+function customInstructionLine(focus) {
+  if (!focus) return null
+  return `Custom report instructions: ${focus}. Treat the custom instructions as binding for what to analyze, estimate, caveat, and emphasize. If the synced GitHub data cannot support part of the request, say so directly and explain the evidence limit.`
+}
+
+function digestSystem(focus) {
+  return [
+    'You digest GitHub repository activity. Be concrete: name people, item keys (owner/repo#N), and outcomes. No filler.',
+    customInstructionLine(focus),
+  ].filter(Boolean).join(' ')
+}
+
+function synthesisSystem({ user, focus }) {
+  return [
+    'You write activity summaries for a software organization. Two voices:',
+    'NARRATIVE (per person): qualitative, subjective, human — describe the *kind* of work, not PR numbers. "Did heavy lifting on X", "Polished the UI and squashed edge-case bugs", "Reviewed several PRs and caught a regression". No issue/PR references here.',
+    'DIGEST: technical, factual — aggregate counts and a list of notable items WITH repo#N references.',
+    'Audience: a lead catching up. Plain statements over adjectives.',
+    user ? `The summary is about user ${user} specifically — omit narrative array.` : 'Cover the whole org.',
+    customInstructionLine(focus),
+  ].filter(Boolean).join(' ')
+}
+
 export async function runSummarize(ctx, inputs, { nowIso = () => new Date().toISOString() } = {}) {
   const from = requireIso(inputs.from, 'from')
   const to = requireIso(inputs.to, 'to')
@@ -197,7 +220,7 @@ export async function runSummarize(ctx, inputs, { nowIso = () => new Date().toIS
       await ctx.progress.progress(0.15 + (0.55 * i) / buckets.length, buckets[i].repo)
       const digest = unwrapGenerated(await ctx.ai.generateObject({
         modelId,
-        system: 'You digest GitHub repository activity. Be concrete: name people, item keys (owner/repo#N), and outcomes. No filler.',
+        system: digestSystem(focus),
         prompt: `${bucketPrompt(buckets[i], meta)}${focusBlock}`,
         schema: DIGEST_SCHEMA,
       }))
@@ -211,13 +234,7 @@ export async function runSummarize(ctx, inputs, { nowIso = () => new Date().toIS
   await ctx.progress.step('Writing summary')
   const generated = await ctx.ai.generateObject({
     modelId,
-    system: [
-      'You write activity summaries for a software organization. Two voices:',
-      'NARRATIVE (per person): qualitative, subjective, human — describe the *kind* of work, not PR numbers. "Did heavy lifting on X", "Polished the UI and squashed edge-case bugs", "Reviewed several PRs and caught a regression". No issue/PR references here.',
-      'DIGEST: technical, factual — aggregate counts and a list of notable items WITH repo#N references.',
-      'Audience: a lead catching up. Plain statements over adjectives.',
-      user ? `The summary is about user ${user} specifically — omit narrative array.` : 'Cover the whole org.',
-    ].join(' '),
+    system: synthesisSystem({ user, focus }),
     prompt: `Timeframe: ${from} to ${to}.${focusBlock}\n\n${synthesisInput}`,
     schema: SYNTHESIS_SCHEMA,
   })

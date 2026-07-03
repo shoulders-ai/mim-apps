@@ -11,6 +11,7 @@ import {
   mapEvent,
   syncItemSlice,
   syncEvents,
+  clearDownloadedData,
   runSync,
 } from './sync.mjs'
 import { makeCtx, memoryData } from '../test/harness.mjs'
@@ -398,6 +399,44 @@ describe('runSync', () => {
     expect(repo).toMatchObject({ key: 'acme/app', openIssues: 4, openPrs: 2, defaultBranch: 'main' })
   })
 
+  it('clears downloaded cache and sync state without touching settings or reports', async () => {
+    const ctx = await configuredCtx({ org: 'acme', summaryModel: 'model-x' }, { schemaVersion: SCHEMA_VERSION, watermark: NOW })
+    await ctx.data.kv.set('reports', [{ path: 'reports/github/keep.md' }])
+    await ctx.data.collection('repos').put(safeId('old/repo'), { key: 'old/repo' })
+    await ctx.data.collection('items').put(safeId('old/repo#1'), { key: 'old/repo#1' })
+    await ctx.data.collection('events').put(safeId('event-1'), { key: 'event-1' })
+    await ctx.data.collection('projects').put(safeId('project-1'), { key: 'project-1' })
+
+    const result = await clearDownloadedData(ctx)
+
+    expect(result).toEqual({ repos: 1, items: 1, events: 1, projects: 1, syncState: true })
+    await expect(ctx.data.collection('repos').list()).resolves.toEqual([])
+    await expect(ctx.data.collection('items').list()).resolves.toEqual([])
+    await expect(ctx.data.collection('events').list()).resolves.toEqual([])
+    await expect(ctx.data.collection('projects').list()).resolves.toEqual([])
+    await expect(ctx.data.kv.get('syncState')).resolves.toBeNull()
+    await expect(ctx.data.kv.get('settings')).resolves.toMatchObject({ org: 'acme', summaryModel: 'model-x' })
+    await expect(ctx.data.kv.get('reports')).resolves.toEqual([{ path: 'reports/github/keep.md' }])
+  })
+
+  it('empties old downloaded rows before a full sync rebuilds the cache', async () => {
+    const ctx = await configuredCtx({ org: 'acme' }, { schemaVersion: SCHEMA_VERSION, watermark: '2026-06-05T00:00:00.000Z' })
+    await ctx.data.collection('repos').put(safeId('old/repo'), { key: 'old/repo' })
+    await ctx.data.collection('items').put(safeId('old/repo#1'), { key: 'old/repo#1', updatedAt: NOW })
+    await ctx.data.collection('events').put(safeId('old-event'), { key: 'old-event', repo: 'old/repo', createdAt: NOW })
+    await ctx.data.collection('projects').put(safeId('project-old'), { key: 'project-old' })
+
+    await runSync(ctx, fakeGh(), { full: true }, { nowIso: () => NOW })
+
+    await expect(ctx.data.collection('items').list()).resolves.toEqual([])
+    const repos = await ctx.data.collection('repos').list()
+    expect(repos.map((row) => row.value.key)).toEqual(['acme/app'])
+    const events = await ctx.data.collection('events').list()
+    expect(events).toEqual([])
+    const projects = await ctx.data.collection('projects').list()
+    expect(projects.map((row) => row.value.key)).toEqual(['project-1'])
+  })
+
   it('resumes from the watermark on incremental syncs', async () => {
     const ctx = await configuredCtx({ org: 'acme' }, { schemaVersion: SCHEMA_VERSION, watermark: '2026-06-05T00:00:00.000Z' })
     const queries = []
@@ -416,12 +455,12 @@ describe('runSync', () => {
   })
 
   it('does not advance the watermark or schema version when the item phase fails', async () => {
-    const prior = { schemaVersion: 0, watermark: '2026-06-05T00:00:00.000Z' }
+    const prior = { schemaVersion: SCHEMA_VERSION, watermark: '2026-06-05T00:00:00.000Z' }
     const ctx = await configuredCtx({ org: 'acme' }, prior)
     const summary = await runSync(ctx, fakeGh({ failSearch: true }), {}, { nowIso: () => NOW })
     expect(summary.errors).toEqual([{ phase: 'items', message: 'search exploded' }])
     const state = await ctx.data.kv.get('syncState')
-    expect(state.schemaVersion).toBe(0)
+    expect(state.schemaVersion).toBe(SCHEMA_VERSION)
     expect(state.watermark).toBe(prior.watermark)
   })
 

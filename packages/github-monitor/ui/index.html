@@ -441,6 +441,7 @@
     .field textarea { min-height: 56px; resize: vertical; }
     .field-row { display: flex; gap: var(--space-sm); align-items: center; }
     .field-row input { flex: 1; }
+    .cache-summary { font-size: 11px; color: var(--color-ink-3); margin-bottom: 6px; }
     .token-status { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--color-ink-3); margin-bottom: 6px; }
     .dot { width: 7px; height: 7px; border-radius: 50%; }
     .dot.ok { background: var(--color-add); }
@@ -571,6 +572,7 @@ const S = {
 
   models: [],
   validateToolName: null,
+  clearCacheToolName: null,
   savingView: false,
 }
 
@@ -664,9 +666,14 @@ async function loadAuxiliary() {
   } catch { S.models = [] }
   try {
     const tools = await runtime.tools.list()
-    const tool = tools.find((t) => t.packageId === 'github-monitor' && t.id === 'validateToken')
-    S.validateToolName = tool?.name || null
-  } catch { S.validateToolName = null }
+    const validateTool = tools.find((t) => t.packageId === 'github-monitor' && t.id === 'validateToken')
+    const clearCacheTool = tools.find((t) => t.packageId === 'github-monitor' && t.id === 'clearDownloadedData')
+    S.validateToolName = validateTool?.name || null
+    S.clearCacheToolName = clearCacheTool?.name || null
+  } catch {
+    S.validateToolName = null
+    S.clearCacheToolName = null
+  }
   // The Reports model picker renders from S.models; refresh it once they land.
   if (S.view === 'reports') renderPane()
 }
@@ -1985,6 +1992,78 @@ document.addEventListener('keydown', (ev) => {
 
 // ── Settings ───────────────────────────────────────────────────────────────
 
+const DOWNLOADED_COLLECTIONS = ['repos', 'items', 'events', 'projects']
+
+function cacheSummaryText() {
+  const parts = [
+    `${S.repos.length} repo${S.repos.length !== 1 ? 's' : ''}`,
+    `${S.items.length} issue/PR item${S.items.length !== 1 ? 's' : ''}`,
+    `${S.events.length} event${S.events.length !== 1 ? 's' : ''}`,
+  ]
+  if (S.syncState) parts.push('sync state')
+  return parts.join(' · ')
+}
+
+function cacheSettingFingerprint(settings) {
+  const repoList = Array.isArray(settings?.repoList)
+    ? settings.repoList.map((repo) => String(repo).trim()).filter(Boolean).sort()
+    : []
+  return JSON.stringify({
+    org: String(settings?.org || '').trim(),
+    syncWindowDays: Number(settings?.syncWindowDays || 90),
+    repoMode: settings?.repoMode || 'all',
+    repoList,
+  })
+}
+
+function settingsAffectCache(prev, next) {
+  return cacheSettingFingerprint(prev) !== cacheSettingFingerprint(next)
+}
+
+function resetDownloadedState() {
+  S.items = []
+  S.events = []
+  S.repos = []
+  S.syncState = null
+  S.selectedKey = null
+  S.work.repo = []
+  S.work.author = []
+  S.work.label = []
+  S.work.projectStatus = []
+  S.activity.repo = []
+  S.activity.author = []
+  S.reports_form.users = []
+  S.reports_form.repos = []
+  persistUiState()
+}
+
+async function clearCollectionRows(name) {
+  const collection = runtime.data.collection(name)
+  const rows = await collection.list()
+  for (const row of rows) await collection.delete(row.id)
+}
+
+async function clearDownloadedData({ confirm = true, quiet = false, renderAfter = true, reopenSettings = false } = {}) {
+  if (confirm && !window.confirm('Clear downloaded GitHub data? Settings, token, saved views, and generated reports will stay.')) return false
+  try {
+    if (!S.clearCacheToolName) await loadAuxiliary()
+    if (S.clearCacheToolName) {
+      await runtime.call('package.tools.execute', { name: S.clearCacheToolName, input: {} })
+    } else {
+      for (const name of DOWNLOADED_COLLECTIONS) await clearCollectionRows(name)
+      await runtime.data.kv.delete('syncState')
+    }
+    resetDownloadedState()
+    if (!quiet) toast('Downloaded GitHub data cleared.')
+    if (renderAfter) render()
+    if (reopenSettings) openSettings()
+    return true
+  } catch (err) {
+    toast(`Could not clear downloaded data: ${err.message}`)
+    return false
+  }
+}
+
 function openSettings() {
   const s = S.settings || {}
   const repoList = Array.isArray(s.repoList) ? s.repoList.join('\n') : ''
@@ -2031,6 +2110,13 @@ function openSettings() {
     </div>
 
     <div class="field">
+      <label>Downloaded data</label>
+      <div class="cache-summary">${esc(cacheSummaryText())}</div>
+      <button class="btn danger" id="btn-clear-cache">Clear downloaded data</button>
+      <div class="hint">Deletes cached repos, issues, pull requests, activity, projects, and sync state. Token, settings, saved views, and generated reports stay.</div>
+    </div>
+
+    <div class="field">
       <label>Summary model</label>
       <select class="select" id="set-model" style="max-width:100%">
         ${option('', 'Workspace default', !s.summaryModel)}
@@ -2052,6 +2138,7 @@ function openSettings() {
   $('btn-token-save').addEventListener('click', saveToken)
   $('btn-token-del')?.addEventListener('click', deleteToken)
   $('btn-validate').addEventListener('click', validateToken)
+  $('btn-clear-cache').addEventListener('click', () => clearDownloadedData({ reopenSettings: true }))
   $('btn-save').addEventListener('click', () => saveSettings(false))
   $('btn-fullsync').addEventListener('click', () => saveSettings(true))
 }
@@ -2124,11 +2211,18 @@ async function saveSettings(fullSync) {
     summaryModel: $('set-model').value || '',
   }
   if (!settings.org) { toast('Set an organization name.'); return }
+  const shouldClearCache = fullSync || settingsAffectCache(S.settings || {}, settings)
+  if (shouldClearCache) {
+    const cleared = await clearDownloadedData({ confirm: false, quiet: true, renderAfter: false })
+    if (!cleared) return
+  }
   await runtime.data.kv.set('settings', settings)
   S.settings = settings
   closeSettings()
   render()
   if (fullSync) startSync(true)
+  else if (shouldClearCache) toast('Settings saved. Downloaded data cleared.')
+  else toast('Settings saved.')
 }
 
 // ── Toast ──────────────────────────────────────────────────────────────────

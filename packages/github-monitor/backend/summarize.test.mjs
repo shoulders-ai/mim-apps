@@ -239,11 +239,28 @@ describe('runSummarize', () => {
     expect(ctx.ai.calls.every((c) => c.modelId === 'model-x')).toBe(true)
   })
 
-  it('threads the focus note into prompts', async () => {
+  it('threads the focus note into the prompt and system instructions', async () => {
     const ctx = makeCtx({ aiResponses: [SYNTHESIS] })
     await seeded(ctx, [item('acme/app', 12)])
     await runSummarize(ctx, { from: FROM, to: TO, focus: 'deploy readiness' }, { nowIso: () => NOW })
     expect(ctx.ai.calls[0].prompt).toContain('User focus note: deploy readiness')
+    expect(ctx.ai.calls[0].system).toContain('Custom report instructions: deploy readiness')
+    expect(ctx.ai.calls[0].system).toContain('Treat the custom instructions as binding')
+  })
+
+  it('adds the focus note to every map-reduce system prompt', async () => {
+    const digest = { shipped: ['x'], inProgress: [], discussed: [], stuck: [] }
+    const ctx = makeCtx({ aiResponses: [digest, digest, SYNTHESIS] })
+    const items = [
+      ...Array.from({ length: 70 }, (_, i) => item('acme/a', i)),
+      ...Array.from({ length: 60 }, (_, i) => item('acme/b', 100 + i)),
+    ]
+    await seeded(ctx, items)
+
+    await runSummarize(ctx, { from: FROM, to: TO, focus: 'estimate AI-authored code share' }, { nowIso: () => NOW })
+
+    expect(ctx.ai.calls).toHaveLength(3)
+    expect(ctx.ai.calls.every((call) => call.system.includes('Custom report instructions: estimate AI-authored code share'))).toBe(true)
   })
 
   it('rejects empty timeframes and bad dates', async () => {

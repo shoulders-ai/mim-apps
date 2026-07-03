@@ -121,4 +121,16 @@ describe('GitHub Monitor UI structural contracts', () => {
     const svg = readFileSync(join(here, 'icon.svg'), 'utf8')
     expect(svg).toMatch(/viewBox="0 0 16 16"/)
   })
+
+  it('offers a settings action to clear downloaded GitHub cache', () => {
+    expect(source).toMatch(/id="btn-clear-cache"/)
+    expect(source).toMatch(/Clear downloaded data/)
+    expect(source).toMatch(/function clearDownloadedData/)
+  })
+
+  it('clears cache-affecting settings changes before saving or full sync', () => {
+    expect(source).toMatch(/function settingsAffectCache/)
+    expect(source).toMatch(/settingsAffectCache\(S\.settings \|\| \{\}, settings\)/)
+    expect(source).toMatch(/await clearDownloadedData\(/)
+  })
 })

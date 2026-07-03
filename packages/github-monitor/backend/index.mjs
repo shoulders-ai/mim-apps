@@ -1,7 +1,7 @@
 // GitHub Monitor backend: jobs and tools exported per the Mim runtime contract.
 
 import { createGitHub, headerGet } from './github.mjs'
-import { runSync } from './sync.mjs'
+import { clearDownloadedData, runSync } from './sync.mjs'
 import { runSummarize } from './summarize.mjs'
 
 async function github(ctx) {
@@ -63,6 +63,15 @@ export const tools = {
         name: result.body?.name || '',
         scopes,
       }
+    },
+  },
+
+  clearDownloadedData: {
+    label: 'Clear downloaded GitHub data',
+    description: 'Delete the local GitHub Monitor cache for repositories, issues, pull requests, activity events, projects, and sync state. Settings, token, saved views, and generated reports are kept.',
+    inputSchema: { type: 'object', properties: {} },
+    async execute(ctx) {
+      return clearDownloadedData(ctx)
     },
   },
 

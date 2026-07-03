@@ -23,7 +23,8 @@ git clone https://github.com/bitowaqr/mim-github-monitor github-monitor
    keychain — it never touches a file and is never shown again.
 3. Enter your organization name, optionally narrow the repository list, and
    pick a summary model (defaults to the workspace chat model).
-4. **Save & full re-sync**.
+4. **Save & full re-sync**. A full re-sync first clears the local downloaded
+   GitHub cache, then rebuilds it from the current settings.
 
 ## What it does
 
@@ -57,7 +58,9 @@ git clone https://github.com/bitowaqr/mim-github-monitor github-monitor
 | `ai: true` | generates summaries via the workspace model registry |
 
 All synced data is a disposable local cache (package collections); deleting it
-just means the next sync rebuilds it.
+just means the next sync rebuilds it. Settings has **Clear downloaded data** for
+removing cached repos, issues, pull requests, events, projects, and sync state
+without removing the token, settings, saved views, or generated reports.
 
 ## Development
 

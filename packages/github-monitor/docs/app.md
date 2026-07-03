@@ -42,6 +42,11 @@ Use a classic PAT with these scopes:
 Fine-grained PATs may work for repository issues and pull requests, but classic
 PATs are the reliable path for organization ProjectsV2 data.
 
+Settings also includes **Clear downloaded data**. It deletes the disposable
+local cache for repositories, issues, pull requests, activity events, ProjectsV2
+metadata, and sync state. It keeps the token, settings, saved views, and
+generated reports.
+
 ## What Sync Does
 
 Sync is local, incremental, and safe to rerun.
@@ -61,6 +66,11 @@ Full sync indexes:
 - repository metadata and open issue/PR totals
 - recent org activity events
 - open ProjectsV2 boards and item statuses
+
+Full sync first clears the downloaded cache so stale records from a previous
+organization or repository filter cannot remain visible. Saving settings also
+clears the cache automatically when the organization, sync window, repository
+mode, or repository list changes.
 
 Incremental sync starts from the stored item watermark and upserts records by
 stable IDs. The cache is disposable: deleting package data only means the next
@@ -146,7 +156,10 @@ AI activity summaries over rolling timeframes. The view is laid out as:
   current scope are hidden unless already selected.
 - **Focus** — an optional free-text instruction for the summarizer (e.g.
   "release readiness", "blockers", "who shipped what"). Left blank, the
-  summarizer covers the whole scope.
+  summarizer covers the whole scope. When provided, this focus is included in
+  the report agent's system instructions and in the activity prompt so every
+  summary pass treats it as binding and calls out evidence limits when the
+  local GitHub data cannot support part of the request.
 - **Eligibility** — a prominent, live count: `N items · M events will be
   summarized`, computed from the local cache against the current scope. It
   warns when nothing matches, and notes when a large dataset triggers
@@ -239,6 +252,7 @@ The token is never written into package data or report files.
 | Activity is sparse | GitHub's org events API is recent activity only, not full history. |
 | Projects are missing | Confirm the token has `read:project` or `project`; fine-grained PATs can be inconsistent here. |
 | Counts look stale | Use Sync, or Save & full re-sync after changing org/repository filters. |
+| Old org data is still visible | Use Settings → Clear downloaded data, or Save & full re-sync. |
 
 ## Current Limits
 

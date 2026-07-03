@@ -340,6 +340,23 @@ export async function syncProjects(gh, data, org, opts = {}) {
   return { projects: projects.length, statusCount }
 }
 
+const DOWNLOADED_COLLECTIONS = ['repos', 'items', 'events', 'projects']
+
+async function clearCollection(data, name) {
+  const collection = data.collection(name)
+  const rows = await collection.list()
+  for (const row of rows) await collection.delete(row.id)
+  return rows.length
+}
+
+export async function clearDownloadedData(ctx) {
+  const counts = {}
+  for (const name of DOWNLOADED_COLLECTIONS) counts[name] = await clearCollection(ctx.data, name)
+  const hadSyncState = (await ctx.data.kv.get('syncState')) !== null
+  await ctx.data.kv.delete('syncState')
+  return { ...counts, syncState: hadSyncState }
+}
+
 export async function runSync(ctx, gh, inputs = {}, { nowIso = () => new Date().toISOString() } = {}) {
   const settings = (await ctx.data.kv.get('settings')) || {}
   if (!settings.org) throw new Error('No organization configured. Open GitHub Monitor settings and set one.')
@@ -348,13 +365,15 @@ export async function runSync(ctx, gh, inputs = {}, { nowIso = () => new Date().
 
   const prior = (await ctx.data.kv.get('syncState')) || {}
   const full = !!inputs.full || prior.schemaVersion !== SCHEMA_VERSION
+  if (full) await clearDownloadedData(ctx)
+  const syncState = full ? {} : { ...prior }
   const now = nowIso()
   const windowStart = new Date(Date.parse(now) - windowDays * 86_400_000).toISOString()
-  const fromIso = full || !prior.watermark ? windowStart : prior.watermark
+  const fromIso = full || !syncState.watermark ? windowStart : syncState.watermark
   const opts = { throwIfAborted: () => ctx.abort?.throwIfAborted?.() }
 
   const summary = { org, full, items: 0, repos: 0, events: 0, projects: 0, truncated: [], errors: [] }
-  let watermark = full ? null : prior.watermark || null
+  let watermark = full ? null : syncState.watermark || null
   let itemPhaseOk = true
 
   await ctx.progress.step('Repositories')
@@ -374,7 +393,7 @@ export async function runSync(ctx, gh, inputs = {}, { nowIso = () => new Date().
     if (maxUpdated && (!watermark || maxUpdated > watermark)) {
       watermark = maxUpdated
       // Persist after the page lands so a crashed run resumes without gaps.
-      if (!full) await ctx.data.kv.set('syncState', { ...prior, schemaVersion: SCHEMA_VERSION, watermark })
+      if (!full) await ctx.data.kv.set('syncState', { ...syncState, schemaVersion: SCHEMA_VERSION, watermark })
     }
     await ctx.progress.progress(Math.min(0.2 + summary.items / 2000, 0.8), `${summary.items + allowed.length} items`)
     summary.items += allowed.length
@@ -390,7 +409,7 @@ export async function runSync(ctx, gh, inputs = {}, { nowIso = () => new Date().
     }
   } catch (err) {
     itemPhaseOk = false
-    watermark = prior.watermark || null
+    watermark = syncState.watermark || null
     if (err instanceof RateLimitError) throw err
     summary.errors.push({ phase: 'items', message: err.message })
   }
@@ -398,13 +417,13 @@ export async function runSync(ctx, gh, inputs = {}, { nowIso = () => new Date().
   await ctx.progress.step('Activity')
   try {
     const events = await syncEvents(gh, ctx.data.collection('events'), org, {
-      etag: prior.eventsEtag,
+      etag: full ? null : syncState.eventsEtag,
       windowDays,
       settings,
       nowIso: now,
     })
     summary.events = events.count
-    prior.eventsEtag = events.etag || prior.eventsEtag
+    syncState.eventsEtag = events.etag || syncState.eventsEtag
   } catch (err) {
     summary.errors.push({ phase: 'events', message: err.message })
   }
@@ -418,9 +437,9 @@ export async function runSync(ctx, gh, inputs = {}, { nowIso = () => new Date().
   }
 
   await ctx.data.kv.set('syncState', {
-    schemaVersion: itemPhaseOk ? SCHEMA_VERSION : prior.schemaVersion,
-    watermark: itemPhaseOk ? watermark || now : prior.watermark || null,
-    eventsEtag: prior.eventsEtag || null,
+    schemaVersion: itemPhaseOk ? SCHEMA_VERSION : syncState.schemaVersion,
+    watermark: itemPhaseOk ? watermark || now : syncState.watermark || null,
+    eventsEtag: syncState.eventsEtag || null,
     lastSyncAt: now,
     lastSummary: summary,
   })
