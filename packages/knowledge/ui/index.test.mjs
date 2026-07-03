@@ -71,6 +71,16 @@ describe('Knowledge UI contract', () => {
     expect(js).toContain('loaded.push(...items.map(normEntry))')
   })
 
+  it('keeps delete low-emphasis and confirms before deleting', () => {
+    const html = source()
+    const js = script()
+
+    expect(html).toContain('aria-label="Delete entry"')
+    expect(html).not.toContain('<button class="detail-delete-btn" id="detailDeleteBtn">Delete</button>')
+    expect(js).toContain('window.confirm(`Delete "${title}"?')
+    expect(js).toContain('if (!confirmed) return')
+  })
+
   it('preserves graph fields and extra metadata when saving through the detail view', () => {
     const js = script()
 

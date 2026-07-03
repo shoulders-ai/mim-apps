@@ -634,17 +634,18 @@
     .detail-delete-btn {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
+      justify-content: center;
+      width: 26px;
       height: 26px;
-      padding: 0 10px;
+      padding: 0;
       border-radius: var(--radius-sm);
-      border: 1px solid var(--color-rem);
-      font-family: var(--font-sans);
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--color-rem);
+      color: var(--color-ink-4);
+      flex-shrink: 0;
     }
-    .detail-delete-btn:hover { background: rgba(192, 93, 60, 0.08); }
+    .detail-delete-btn:hover {
+      color: var(--color-rem);
+      background: rgba(192, 93, 60, 0.08);
+    }
 
     /* ── New Entry Form ── */
     .new-overlay {
@@ -782,6 +783,9 @@
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         Open
       </button>
+      <button class="detail-delete-btn" id="detailDeleteBtn" title="Delete entry" aria-label="Delete entry">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg>
+      </button>
     </div>
     <div class="detail-tags-row">
       <span class="detail-tags-label">Tags</span>
@@ -808,7 +812,6 @@
       <span class="detail-date" id="detailDate"></span>
       <span class="detail-spacer"></span>
       <button class="detail-edit-btn" id="detailEditBtn">Edit</button>
-      <button class="detail-delete-btn" id="detailDeleteBtn">Delete</button>
     </div>
   </div>
 </div>
@@ -1519,6 +1522,10 @@ detailEditBtn.addEventListener('click', () => {
 detailDeleteBtn.addEventListener('click', async () => {
   const id = openDetailId
   if (!id) return
+  const entry = entries.find(e => e.id === id)
+  const title = entry?.title || id
+  const confirmed = window.confirm(`Delete "${title}"?\n\nThis cannot be undone.`)
+  if (!confirmed) return
   openDetailId = null
   overlayEl.style.display = 'none'
   await deleteEntry(id)
