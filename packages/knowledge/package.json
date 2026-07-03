@@ -1,6 +1,6 @@
 {
   "name": "@mim/knowledge",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "type": "module",
   "mim": {
     "manifestVersion": 1,
