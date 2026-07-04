@@ -11,6 +11,7 @@ export const state = {
   view: 'board',
   page: 'project',
   detailIssueId: null,
+  detailBodyEditing: false,
 
   settingsOpen: false,
   modalOpen: false,

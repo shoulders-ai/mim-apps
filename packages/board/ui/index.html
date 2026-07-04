@@ -2,6 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <script>
+    // Mim passes the active theme tokens in the launch URL fragment so the
+    // first paint matches the host theme (tokens.css alone would flash its
+    // light defaults in dark mode). Live changes still arrive via postMessage.
+    try {
+      const match = /mim-theme=([^&]+)/.exec(location.hash)
+      if (match) {
+        const tokens = JSON.parse(decodeURIComponent(match[1]))
+        for (const [key, value] of Object.entries(tokens)) {
+          document.documentElement.style.setProperty(key, value)
+        }
+      }
+    } catch {}
+  </script>
   <link rel="stylesheet" href="/sdk/tokens.css">
   <title>Board</title>
   <style>
@@ -842,7 +856,7 @@
     .detail-textarea {
       display: block;
       width: 100%;
-      min-height: 200px;
+      min-height: max(220px, calc(100vh - 320px));
       resize: none;
       border: 1px solid var(--color-rule-light);
       border-radius: 7px;
@@ -859,6 +873,80 @@
     }
     .detail-textarea:focus { border-color: var(--color-accent); }
     .detail-textarea::placeholder { color: var(--color-ink-4); }
+
+    /* ── Description markdown preview (click to edit) ── */
+    .detail-md {
+      min-height: max(220px, calc(100vh - 320px));
+      border: 1px solid transparent;
+      border-radius: 7px;
+      padding: 12px 14px;
+      font-size: 13px;
+      line-height: 1.65;
+      color: var(--color-ink);
+      user-select: text;
+      -webkit-user-select: text;
+    }
+    .detail-md:hover { background: var(--color-chrome-high); border-color: var(--color-rule-light); }
+    .detail-md-empty { color: var(--color-ink-4); }
+    .detail-md h1, .detail-md h2, .detail-md h3 {
+      margin: 14px 0 6px;
+      line-height: 1.3;
+      color: var(--color-ink);
+    }
+    .detail-md h1:first-child, .detail-md h2:first-child, .detail-md h3:first-child { margin-top: 0; }
+    .detail-md h1 { font-size: 17px; }
+    .detail-md h2 { font-size: 15px; }
+    .detail-md h3 { font-size: 13px; }
+    .detail-md p { margin: 0 0 10px; }
+    .detail-md p:last-child { margin-bottom: 0; }
+    .detail-md ul, .detail-md ol { margin: 0 0 10px; padding-left: 20px; }
+    .detail-md li { margin: 2px 0; }
+    .detail-md li.task-check { list-style: none; margin-left: -14px; }
+    .detail-md li.task-check::before {
+      content: "";
+      display: inline-block;
+      width: 10px; height: 10px;
+      margin-right: 6px;
+      border: 1.5px solid var(--color-ink-4);
+      border-radius: 3px;
+      vertical-align: -1px;
+    }
+    .detail-md li.task-check.checked::before {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+    }
+    .detail-md li.task-check.checked { color: var(--color-ink-3); text-decoration: line-through; }
+    .detail-md code {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      background: var(--color-chrome-mid);
+      border-radius: 3px;
+      padding: 1px 4px;
+    }
+    .detail-md pre {
+      margin: 0 0 10px;
+      padding: 10px 12px;
+      background: var(--color-chrome-high);
+      border: 1px solid var(--color-rule-light);
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+    .detail-md pre code { background: transparent; padding: 0; }
+    .detail-md blockquote {
+      margin: 0 0 10px;
+      padding: 2px 0 2px 10px;
+      border-left: 3px solid var(--color-rule-light);
+      color: var(--color-ink-3);
+    }
+    .detail-md hr { border: 0; height: 1px; background: var(--color-rule-light); margin: 12px 0; }
+    .detail-md a { color: var(--color-accent); text-decoration: underline; }
+    .detail-md table { border-collapse: collapse; margin: 0 0 10px; font-size: 12px; }
+    .detail-md th, .detail-md td {
+      border: 1px solid var(--color-rule-light);
+      padding: 4px 8px;
+      text-align: left;
+    }
+    .detail-md th { background: var(--color-chrome-high); font-weight: 650; }
     .detail-rule { height: 1px; background: var(--color-rule-light); margin: 16px 0; }
     .detail-created-line {
       font-size: 11px;
@@ -1134,14 +1222,26 @@
     .offer-btn:hover { opacity: .9; }
     .offer-error { font-size: 11px; color: var(--color-rem, #c0392b); max-width: 240px; line-height: 1.5; margin-top: 8px; }
 
-    /* ── Loading ── */
-    .loading {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      color: var(--color-ink-4);
-      font-size: 12px;
+    /* ── Loading skeleton (static first paint, replaced by first render) ── */
+    .skel-bar {
+      display: inline-block;
+      width: 90px;
+      height: 13px;
+      margin: 4px 3px 6px;
+      border-radius: 4px;
+      background: var(--color-chrome-mid);
+    }
+    .skel-card {
+      height: 80px;
+      flex-shrink: 0;
+      border: 1px solid var(--color-rule-light);
+      border-radius: 6px;
+      background: var(--color-chrome-high);
+      animation: skel-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes skel-pulse {
+      0%, 100% { opacity: .45; }
+      50% { opacity: 1; }
     }
 
     /* ── Keyboard hint ── */
@@ -1280,7 +1380,51 @@
   </style>
 </head>
 <body>
-  <div id="app"></div>
+  <div id="app">
+    <div id="toolbar">
+      <div class="header-bar">
+        <div class="header-left">
+          <span class="header-title">Board</span>
+        </div>
+        <div class="header-right"></div>
+      </div>
+      <div class="tab-bar">
+        <div class="tabs-left"></div>
+        <div class="tabs-right"></div>
+      </div>
+    </div>
+    <section id="content">
+      <div class="board" aria-hidden="true">
+        <div class="column">
+          <div class="col-header"><span class="skel-bar"></span></div>
+          <div class="col-cards">
+            <div class="skel-card"></div>
+            <div class="skel-card"></div>
+            <div class="skel-card"></div>
+          </div>
+        </div>
+        <div class="column">
+          <div class="col-header"><span class="skel-bar"></span></div>
+          <div class="col-cards">
+            <div class="skel-card"></div>
+            <div class="skel-card"></div>
+          </div>
+        </div>
+        <div class="column">
+          <div class="col-header"><span class="skel-bar"></span></div>
+          <div class="col-cards">
+            <div class="skel-card"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <div id="settingsLayer"></div>
+    <div id="fieldMenuLayer"></div>
+    <div id="reminderLayer"></div>
+    <div id="toastLayer"></div>
+    <div id="modalLayer"></div>
+    <div class="kbd-hint"><kbd>C</kbd> create <kbd>/</kbd> search <kbd>B</kbd> board <kbd>L</kbd> list</div>
+  </div>
   <script type="module">
     import { init } from './js/render.js'
     init()

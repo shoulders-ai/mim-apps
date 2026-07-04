@@ -98,3 +98,61 @@ describe('Board detail view draft contracts', () => {
     expect(state.issues[0].body).toBeUndefined()
   })
 })
+
+describe('Board detail description modes', () => {
+  beforeEach(() => {
+    state.issues = [{
+      ...makeNewIssueDraft(),
+      id: 'issue-1700000000-cd34',
+      title: 'Ship it',
+      body: '## header2\n\nSome *text*',
+      status: 'backlog',
+      priority: 'normal',
+      labels: [],
+      tags: [],
+      project: '',
+      assignee: '',
+      dueDate: '',
+      created: '2026-01-01T00:00:00.000Z',
+      updated: '',
+    }]
+    state.detailIssueId = 'issue-1700000000-cd34'
+    state.page = 'detail'
+    state.detailBodyEditing = false
+  })
+
+  afterEach(() => {
+    delete globalThis.document
+    state.detailBodyEditing = false
+  })
+
+  it('renders the body as markdown when not editing', () => {
+    const html = renderDetail()
+    expect(html).toContain('<h2>header2</h2>')
+    expect(html).toContain('<em>text</em>')
+    expect(html).not.toContain('id="detailBody"')
+    expect(html).toContain('data-action="edit-body"')
+  })
+
+  it('renders the textarea when editing', () => {
+    state.detailBodyEditing = true
+    const html = renderDetail()
+    expect(html).toContain('id="detailBody"')
+    expect(html).toContain('## header2')
+    expect(html).not.toContain('<h2>header2</h2>')
+  })
+
+  it('shows a click-to-edit placeholder for an empty body', () => {
+    state.issues[0].body = ''
+    const html = renderDetail()
+    expect(html).toContain('data-action="edit-body"')
+    expect(html).toContain('Add a description')
+  })
+
+  it('does not offer editing before the body has loaded', () => {
+    delete state.issues[0].body
+    const html = renderDetail()
+    expect(html).not.toContain('data-action="edit-body"')
+    expect(html).not.toContain('id="detailBody"')
+  })
+})

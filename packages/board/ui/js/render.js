@@ -1,7 +1,7 @@
 import { state, setRenderFn, render } from './state.js'
 import { renderBoard, initBoardDrag } from './board.js'
 import { renderList } from './list.js'
-import { renderDetail, initDetailListeners, openDetail, closeDetail, handleDeleteIssue, syncDetailDraftFromDom } from './detail.js'
+import { renderDetail, initDetailListeners, openDetail, closeDetail, handleDeleteIssue, syncDetailDraftFromDom, startBodyEdit, autoGrow } from './detail.js'
 import { makeNewIssueDraft } from './createDraft.js'
 import { renderCreateModal, handleCreateIssue, initCreateListeners, syncCreateDraftFromDom } from './create.js'
 import { renderFieldMenu, handleFieldSelect, openFieldMenu, initFieldMenuListeners, handleLabelColorChange, commitFieldMenuTextInput } from './fields.js'
@@ -33,7 +33,20 @@ function renderPage() {
   }
 
   if (state.page === 'detail') {
+    // Re-rendering replaces the textarea; carry focus, caret, and grown
+    // height across, or an open editor snaps back to a clipped box.
+    const prev = qs('#detailBody')
+    const hadFocus = prev && document.activeElement === prev
+    const caret = hadFocus ? [prev.selectionStart, prev.selectionEnd] : null
     content.innerHTML = renderDetail()
+    const bodyEl = qs('#detailBody')
+    if (bodyEl) {
+      autoGrow(bodyEl)
+      if (caret) {
+        bodyEl.focus()
+        bodyEl.setSelectionRange(caret[0], caret[1])
+      }
+    }
     return
   }
 
@@ -80,7 +93,10 @@ function handleClick(e) {
   if (state.deleteConfirmId && action !== 'delete-issue') {
     state.deleteConfirmId = null
   }
-  if (state.fieldMenu && !e.target.closest('.field-menu')) {
+  // open-field/open-new-field commit inside openFieldMenu, after measuring
+  // the trigger rect — committing here re-renders and detaches the trigger.
+  if (state.fieldMenu && !e.target.closest('.field-menu')
+    && action !== 'open-field' && action !== 'open-new-field') {
     commitFieldMenuTextInput({ close: true })
   }
 
@@ -234,6 +250,12 @@ function handleClick(e) {
     return
   }
 
+  if (action === 'edit-body') {
+    if (e.target.closest('a')) return
+    startBodyEdit()
+    return
+  }
+
   if (action === 'go-back') {
     closeDetail()
     return
@@ -326,16 +348,13 @@ function handleOverlayClick(e) {
 }
 
 export async function init() {
+  // index.html ships the scaffold and a skeleton board statically so the
+  // app paints before this module graph and the runtime socket are up;
+  // adopt it and only inject the SVG sprite.
   const app = qs('#app')
-  app.innerHTML = `${SVG_DEFS}
-    <div id="toolbar"></div>
-    <section id="content"><div class="loading">Loading...</div></section>
-    <div id="settingsLayer"></div>
-    <div id="fieldMenuLayer"></div>
-    <div id="reminderLayer"></div>
-    <div id="toastLayer"></div>
-    <div id="modalLayer"></div>
-    <div class="kbd-hint"><kbd>C</kbd> create <kbd>/</kbd> search <kbd>B</kbd> board <kbd>L</kbd> list</div>`
+  const defs = document.createElement('div')
+  defs.innerHTML = SVG_DEFS
+  app.prepend(defs.firstElementChild || defs)
 
   setRenderFn(renderAll)
   initBoardDrag()
