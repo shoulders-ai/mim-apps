@@ -6,7 +6,17 @@ import { saveIssue } from './data.js'
 import { escapeAttr, escapeHtml, qs } from './utils.js'
 
 export function openFieldMenu(trigger, field, issueId, isNew = false) {
+  const prev = state.fieldMenu
+  // Measure before committing pending menu input: the commit re-renders,
+  // which detaches the clicked trigger and makes its rect read (0,0) —
+  // the menu would then land at the top-left of the window.
   const rect = trigger.getBoundingClientRect()
+  commitFieldMenuTextInput()
+  if (prev && prev.field === field && prev.issueId === issueId && prev.isNew === isNew) {
+    state.fieldMenu = null
+    render()
+    return
+  }
   const width = field === 'priority' ? 180 : 220
   const x = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))
   const y = Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 300))
