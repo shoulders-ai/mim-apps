@@ -159,6 +159,13 @@ describe('knowledge package tools', () => {
     }
   })
 
+  it('declares string compatibility for coerced tag and link inputs', () => {
+    expect(tools.create.inputSchema.properties.tags.type).toEqual(['array', 'string'])
+    expect(tools.create.inputSchema.properties.links.type).toEqual(['array', 'string'])
+    expect(tools.update.inputSchema.properties.tags.type).toEqual(['array', 'string'])
+    expect(tools.update.inputSchema.properties.links.type).toEqual(['array', 'string'])
+  })
+
   it('list returns folderPresent:false without creating knowledge/', async () => {
     const ctx = createCtx()
     await expect(listKnowledge(ctx)).resolves.toEqual({ items: [], folderPresent: false })

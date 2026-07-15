@@ -25,6 +25,8 @@ const KNOWN_FIELDS = new Set([
   'body',
 ])
 
+const stringListInputSchema = { type: ['array', 'string'], items: { type: 'string' } }
+
 const fieldsSchema = {
   id: { type: 'string', description: 'Optional lowercase slug id, e.g. fde-three-views.' },
   title: { type: 'string' },
@@ -34,9 +36,9 @@ const fieldsSchema = {
     maxLength: SUMMARY_RECOMMENDED_CHARS,
     description: `Optional retrieval summary. Keep under ${SUMMARY_RECOMMENDED_CHARS} characters unless there is a strong reason.`,
   },
-  tags: { type: 'array', items: { type: 'string' } },
+  tags: stringListInputSchema,
   links: {
-    type: 'array',
+    ...stringListInputSchema,
     items: { type: 'string' },
     description: 'Directed graph links as "relation target-id", e.g. "works_at example-org".',
   },
