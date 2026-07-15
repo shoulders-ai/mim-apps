@@ -13,6 +13,7 @@ Browse and install from **Settings > Apps** inside Mim.
 | **GitHub Monitor** | Org-wide GitHub activity: issues, PRs, project boards, saved views, AI summaries. |
 | **Import to Markdown** | Converts Word, Excel, BibTeX, and PDF files into AI-ready Markdown. |
 | **Knowledge** | Workspace knowledge base for persistent notes, decisions, and context. |
+| **Mail** | AI-native Gmail: local mirror, proposal-state AI drafting, legible voices, hard human send gate, provenance flywheel. |
 | **References** | Reference library with DOI, PDF, and paste capture. Grounded citation tools for the editor. |
 | **Scholar** | Reproducible literature search across PubMed, Europe PMC, arXiv, ClinicalTrials.gov, and more. |
 | **Slides** | Slide decks as paginated HTML with print-exact PDF export. |

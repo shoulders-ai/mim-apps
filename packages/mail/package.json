@@ -1,0 +1,35 @@
+{
+  "name": "@mim/mail",
+  "version": "0.1.0",
+  "type": "module",
+  "mim": {
+    "manifestVersion": 1,
+    "id": "mail",
+    "name": "Mail",
+    "icon": "./ui/icon.svg",
+    "description": "AI-native Gmail: collaborative drafting with proposal review, legible voices, a hard human send gate, and a provenance flywheel.",
+    "views": [{ "id": "main", "label": "Mail", "src": "./ui/index.html", "role": "work" }],
+    "backend": "./backend/index.mjs",
+    "permissions": {
+      "ai": true,
+      "http": ["gmail.googleapis.com", "oauth2.googleapis.com"],
+      "secrets": ["google_oauth_client", "google_oauth_tokens"]
+    },
+    "provides": {
+      "tools": [
+        { "name": "mail.search",        "category": "read",    "risk": "low" },
+        { "name": "mail.thread",        "category": "read",    "risk": "low" },
+        { "name": "mail.message",       "category": "read",    "risk": "low" },
+        { "name": "mail.labels",        "category": "read",    "risk": "low" },
+        { "name": "mail.label",         "category": "write",   "risk": "medium" },
+        { "name": "mail.sync",          "category": "network", "risk": "medium" },
+        { "name": "mail.drafts",        "category": "read",    "risk": "low" },
+        { "name": "mail.draft.get",     "category": "read",    "risk": "low" },
+        { "name": "mail.draft.create",  "category": "write",   "risk": "medium" },
+        { "name": "mail.draft.propose", "category": "write",   "risk": "medium" },
+        { "name": "mail.voices",        "category": "read",    "risk": "low" }
+      ]
+    },
+    "engines": { "mim": "runtime-v1" }
+  }
+}
