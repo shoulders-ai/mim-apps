@@ -20,7 +20,6 @@ const issueFieldsSchema = {
   status: { type: 'string', enum: STATUSES },
   priority: { type: 'string', enum: PRIORITIES },
   dueDate: { type: 'string' },
-  tags: { type: 'array', items: { type: 'string' } },
   project: { type: 'string' },
   assignee: { type: 'string' },
   labels: {
@@ -233,11 +232,6 @@ export function serializeIssue(issue) {
       lines.push(`  - name: ${yamlScalar(label.name)}`)
       lines.push(`    color: ${yamlScalar(label.color ?? 'gray')}`)
     }
-    lines.push('tags:')
-    for (const label of issue.labels) lines.push(`  - ${yamlScalar(label.name)}`)
-  } else if (Array.isArray(issue.tags) && issue.tags.length > 0) {
-    lines.push('tags:')
-    for (const tag of issue.tags) lines.push(`  - ${yamlScalar(tag)}`)
   }
   if (issue.waitingFor !== undefined) lines.push(`waiting_for: ${yamlScalar(issue.waitingFor)}`)
   if (issue.snoozeUntil !== undefined) lines.push(`snooze_until: ${yamlScalar(issue.snoozeUntil)}`)
@@ -260,7 +254,9 @@ export function validateIssue(partial) {
   if (partial.status !== undefined && !STATUSES.includes(partial.status)) errors.push('invalid status')
   if (partial.priority !== undefined && !PRIORITIES.includes(partial.priority)) errors.push('invalid priority')
   if (partial.labels !== undefined) {
-    for (const l of partial.labels ?? []) {
+    if (!Array.isArray(partial.labels)) {
+      errors.push('labels must be an array')
+    } else for (const l of partial.labels) {
       if (!l || typeof l.name !== 'string' || l.name.trim() === '') {
         errors.push('each label needs a non-empty name')
         break
@@ -272,7 +268,9 @@ export function validateIssue(partial) {
     }
   }
   if (partial.deliverables !== undefined) {
-    for (const d of partial.deliverables ?? []) {
+    if (!Array.isArray(partial.deliverables)) {
+      errors.push('deliverables must be an array')
+    } else for (const d of partial.deliverables) {
       if (!d || typeof d.path !== 'string' || d.path === '') {
         errors.push('each deliverable needs a path')
         break
@@ -322,13 +320,14 @@ export async function getIssue(ctx, input) {
 
 export async function createIssue(ctx, input = {}) {
   if (!await folderPresent(ctx)) return { folderPresent: false }
+  if (Object.hasOwn(input, 'tags')) throw new Error('tags is not supported in issue tool input; use labels')
   const validation = validateIssue(input)
   if (!validation.ok) throw new Error(validation.errors.join('; '))
 
   const timestamp = new Date().toISOString()
   const labels = Array.isArray(input.labels)
     ? coerceLabels(input.labels, [])
-    : coerceLabels(null, Array.isArray(input.tags) ? input.tags : [])
+    : []
   const issue = {
     id: '',
     title: input.title,
@@ -370,11 +369,9 @@ export async function updateIssue(ctx, input = {}) {
   const existing = await readIssueFile(ctx, id)
   const patch = { ...input }
   delete patch.id
+  if (Object.hasOwn(patch, 'tags')) throw new Error('tags is not supported in issue tool input; use labels')
   if (Array.isArray(patch.labels)) {
     patch.labels = coerceLabels(patch.labels, [])
-    patch.tags = patch.labels.map(l => l.name)
-  } else if (Array.isArray(patch.tags) && !Array.isArray(patch.labels)) {
-    patch.labels = coerceLabels(null, patch.tags)
     patch.tags = patch.labels.map(l => l.name)
   }
   const merged = { ...existing, ...patch, id: existing.id, created: existing.created }

@@ -100,6 +100,7 @@ describe('board package issue model', () => {
     expect(serialized).toContain('project:')
     expect(serialized).toContain('assignee:')
     expect(serialized).toContain('labels:')
+    expect(serialized).not.toContain('tags:')
     expect(serialized).not.toContain('waitingFor:')
     expect(serialized).not.toContain('snoozeUntil:')
     expect(parseIssue(issue.id, serialized)).toEqual(issue)
@@ -126,6 +127,13 @@ describe('board package issue model', () => {
     expect(validateIssue({ title: 'X', labels: [{ name: 'bug' }] }).ok).toBe(true)
     expect(validateIssue({ title: 'X', labels: [{ name: '' }] }).ok).toBe(false)
     expect(validateIssue({ title: 'X', labels: [{ name: 'bug', color: 'neon' }] }).ok).toBe(false)
+  })
+
+  it('rejects JSON-encoded labels strings with type errors', () => {
+    expect(validateIssue({ title: 'X', labels: '[{"name":"bug"}]' })).toEqual({
+      ok: false,
+      errors: ['labels must be an array'],
+    })
   })
 
   it('migrates tags to labels when only tags are present in frontmatter', () => {
@@ -166,6 +174,8 @@ describe('board package issue tools', () => {
     for (const tool of Object.values(tools)) {
       expect(tool.inputSchema).toBeDefined()
     }
+    expect(tools.create.inputSchema.properties.tags).toBeUndefined()
+    expect(tools.update.inputSchema.properties.tags).toBeUndefined()
   })
 
   it('list returns folderPresent:false without creating issues/', async () => {
@@ -218,6 +228,16 @@ describe('board package issue tools', () => {
     const deleted = await deleteIssue(ctx, { id: created.id })
     expect(deleted).toEqual({ ok: true })
     expect(ctx.files.has(`issues/${created.id}.md`)).toBe(false)
+  })
+
+  it('rejects tags in create and update tool input', async () => {
+    const ctx = createCtx({ 'issues/.keep': '' })
+    await expect(createIssue(ctx, { title: 'Tagged', tags: ['old'] }))
+      .rejects.toThrow('tags is not supported in issue tool input; use labels')
+
+    const created = await createIssue(ctx, { title: 'Labelled', labels: [{ name: 'current' }] })
+    await expect(updateIssue(ctx, { id: created.id, tags: ['old'] }))
+      .rejects.toThrow('tags is not supported in issue tool input; use labels')
   })
 
   it('agentContext summarizes issue state', async () => {

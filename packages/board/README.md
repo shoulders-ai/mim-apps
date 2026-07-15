@@ -18,3 +18,6 @@ Click an issue to open the full detail view with editable title, description, an
 ## Tools
 
 `issues.list`, `issues.get`, `issues.create`, `issues.update`, `issues.delete`
+
+For `issues.create` and `issues.update`, pass `labels` as a native array.
+JSON-encoded strings are rejected by the tool schema.

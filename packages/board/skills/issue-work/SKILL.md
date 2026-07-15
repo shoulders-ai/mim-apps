@@ -24,7 +24,7 @@ Use issues when the user asks to:
 | `title` | string | Required. Short, actionable. |
 | `status` | enum | `backlog` (Inbox), `plan` (To Do), `in-progress`, `waiting`, `review`, `done`, `cancelled` |
 | `priority` | enum | `low`, `normal`, `high`, `urgent` |
-| `labels` | array | Each label: `{name, color}`. Colors: `gray`, `green`, `yellow`, `blue`, `purple`, `red`, `orange`. Replaces legacy `tags`. |
+| `labels` | array | Each label: `{name, color}`. Colors: `gray`, `green`, `yellow`, `blue`, `purple`, `red`, `orange`. |
 | `project` | string | Groups related issues. Free text, e.g. "Website redesign". |
 | `assignee` | string | Who owns the issue. Free text name. |
 | `dueDate` | string | ISO date, e.g. "2026-07-01". |
@@ -34,9 +34,9 @@ Use issues when the user asks to:
 | `deliverables` | array | Each: `{path, label?}`. Files this issue produces. |
 | `body` | string | Markdown. Objective, plan, decisions, blockers, next action. |
 
-### Legacy compatibility
+### Older Files
 
-`tags` (flat string array) is still accepted on create/update and returned in responses, but `labels` is the primary field. When creating issues, prefer `labels` over `tags`. If the user mentions tags, map them to labels with `color: "gray"`.
+Older issue files with `tags:` frontmatter are read as gray labels. New tool calls must use `labels`. Do not pass JSON-encoded strings such as `'[{"name":"bug"}]'`.
 
 ## Workflow
 

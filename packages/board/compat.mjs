@@ -40,21 +40,6 @@ export async function smoke({ tools }) {
   const listed = await tools.call('issues.list', {}, ctx)
   assert.ok(listed.items.some(item => item.id === created.id && item.status === 'done'))
 
-  // Legacy tags compat: create with tags, get back labels
-  const legacy = await tools.call('issues.create', {
-    title: 'Legacy tags issue',
-    status: 'backlog',
-    priority: 'normal',
-    tags: ['old-tag'],
-    body: '',
-  }, ctx)
-  assert.ok(Array.isArray(legacy.labels))
-  assert.equal(legacy.labels[0].name, 'old-tag')
-  assert.equal(legacy.labels[0].color, 'gray')
-  assert.ok(Array.isArray(legacy.tags))
-  assert.ok(legacy.tags.includes('old-tag'))
-
-  await tools.call('issues.delete', { id: legacy.id }, ctx)
   await tools.call('issues.delete', { id: created.id }, ctx)
   const after = await tools.call('issues.list', {}, ctx)
   assert.equal(after.items.some(item => item.id === created.id), false)
