@@ -16,9 +16,9 @@
       },
       "repo": "https://github.com/shoulders-ai/mim-apps",
       "path": "packages/board",
-      "version": "0.1.6",
-      "ref": "ee241155fa6337cee5fbba5bf2d3da6c452ce818",
-      "commit": "ee241155fa6337cee5fbba5bf2d3da6c452ce818"
+      "version": "0.1.7",
+      "ref": "0a57ba3fae63e307b1382b7890ba0ef031cd3434",
+      "commit": "0a57ba3fae63e307b1382b7890ba0ef031cd3434"
     },
     {
       "id": "docx-review",
@@ -42,8 +42,8 @@
       "repo": "https://github.com/shoulders-ai/mim-apps",
       "path": "packages/docx-review",
       "version": "0.2.1",
-      "ref": "ee241155fa6337cee5fbba5bf2d3da6c452ce818",
-      "commit": "ee241155fa6337cee5fbba5bf2d3da6c452ce818"
+      "ref": "0a57ba3fae63e307b1382b7890ba0ef031cd3434",
+      "commit": "0a57ba3fae63e307b1382b7890ba0ef031cd3434"
     },
     {
       "id": "github-monitor",
@@ -68,8 +68,8 @@
       "repo": "https://github.com/shoulders-ai/mim-apps",
       "path": "packages/github-monitor",
       "version": "0.3.5",
-      "ref": "ee241155fa6337cee5fbba5bf2d3da6c452ce818",
-      "commit": "ee241155fa6337cee5fbba5bf2d3da6c452ce818"
+      "ref": "0a57ba3fae63e307b1382b7890ba0ef031cd3434",
+      "commit": "0a57ba3fae63e307b1382b7890ba0ef031cd3434"
     },
     {
       "id": "import-md",
@@ -87,8 +87,8 @@
       "repo": "https://github.com/shoulders-ai/mim-apps",
       "path": "packages/import-md",
       "version": "0.1.3",
-      "ref": "ee241155fa6337cee5fbba5bf2d3da6c452ce818",
-      "commit": "ee241155fa6337cee5fbba5bf2d3da6c452ce818"
+      "ref": "0a57ba3fae63e307b1382b7890ba0ef031cd3434",
+      "commit": "0a57ba3fae63e307b1382b7890ba0ef031cd3434"
     },
     {
       "id": "knowledge",
@@ -105,9 +105,33 @@
       },
       "repo": "https://github.com/shoulders-ai/mim-apps",
       "path": "packages/knowledge",
-      "version": "0.1.7",
-      "ref": "ee241155fa6337cee5fbba5bf2d3da6c452ce818",
-      "commit": "ee241155fa6337cee5fbba5bf2d3da6c452ce818"
+      "version": "0.1.8",
+      "ref": "0a57ba3fae63e307b1382b7890ba0ef031cd3434",
+      "commit": "0a57ba3fae63e307b1382b7890ba0ef031cd3434"
+    },
+    {
+      "id": "mail",
+      "name": "Mail",
+      "description": "AI-native Gmail: collaborative drafting with proposal review, legible voices, a hard human send gate, and a provenance flywheel.",
+      "permissions": {
+        "ai": true,
+        "http": [
+          "gmail.googleapis.com",
+          "oauth2.googleapis.com"
+        ],
+        "secrets": [
+          "google_oauth_client",
+          "google_oauth_tokens"
+        ]
+      },
+      "engines": {
+        "mim": "runtime-v1"
+      },
+      "repo": "https://github.com/shoulders-ai/mim-apps",
+      "path": "packages/mail",
+      "version": "0.1.0",
+      "ref": "0a57ba3fae63e307b1382b7890ba0ef031cd3434",
+      "commit": "0a57ba3fae63e307b1382b7890ba0ef031cd3434"
     },
     {
       "id": "references",
@@ -132,8 +156,8 @@
       "repo": "https://github.com/shoulders-ai/mim-apps",
       "path": "packages/references",
       "version": "0.1.0",
-      "ref": "ee241155fa6337cee5fbba5bf2d3da6c452ce818",
-      "commit": "ee241155fa6337cee5fbba5bf2d3da6c452ce818"
+      "ref": "0a57ba3fae63e307b1382b7890ba0ef031cd3434",
+      "commit": "0a57ba3fae63e307b1382b7890ba0ef031cd3434"
     },
     {
       "id": "scholar",
@@ -165,8 +189,8 @@
       "repo": "https://github.com/shoulders-ai/mim-apps",
       "path": "packages/scholar",
       "version": "0.1.0",
-      "ref": "ee241155fa6337cee5fbba5bf2d3da6c452ce818",
-      "commit": "ee241155fa6337cee5fbba5bf2d3da6c452ce818"
+      "ref": "0a57ba3fae63e307b1382b7890ba0ef031cd3434",
+      "commit": "0a57ba3fae63e307b1382b7890ba0ef031cd3434"
     },
     {
       "id": "slides",
@@ -185,8 +209,8 @@
       "repo": "https://github.com/shoulders-ai/mim-apps",
       "path": "packages/slides",
       "version": "0.2.0",
-      "ref": "ee241155fa6337cee5fbba5bf2d3da6c452ce818",
-      "commit": "ee241155fa6337cee5fbba5bf2d3da6c452ce818"
+      "ref": "0a57ba3fae63e307b1382b7890ba0ef031cd3434",
+      "commit": "0a57ba3fae63e307b1382b7890ba0ef031cd3434"
     },
     {
       "id": "word-count",
@@ -203,8 +227,8 @@
       "repo": "https://github.com/shoulders-ai/mim-apps",
       "path": "packages/word-count",
       "version": "0.1.0",
-      "ref": "ee241155fa6337cee5fbba5bf2d3da6c452ce818",
-      "commit": "ee241155fa6337cee5fbba5bf2d3da6c452ce818"
+      "ref": "0a57ba3fae63e307b1382b7890ba0ef031cd3434",
+      "commit": "0a57ba3fae63e307b1382b7890ba0ef031cd3434"
     },
     {
       "id": "word-count-2",
@@ -221,8 +245,8 @@
       "repo": "https://github.com/shoulders-ai/mim-apps",
       "path": "packages/word-count-2",
       "version": "0.1.0",
-      "ref": "ee241155fa6337cee5fbba5bf2d3da6c452ce818",
-      "commit": "ee241155fa6337cee5fbba5bf2d3da6c452ce818"
+      "ref": "0a57ba3fae63e307b1382b7890ba0ef031cd3434",
+      "commit": "0a57ba3fae63e307b1382b7890ba0ef031cd3434"
     }
   ]
 }
