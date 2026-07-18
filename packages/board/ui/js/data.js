@@ -1,5 +1,6 @@
 import { runtime } from '/sdk/mim.js'
 import { STATUSES, PRIORITIES, STATUS_ALIAS, PRIORITY_ALIAS, DEFAULT_COLUMNS } from './constants.js'
+import { issueUpdatePayload } from './payload.js'
 import { state, render, showToast } from './state.js'
 
 function normStatus(s) {
@@ -88,19 +89,7 @@ export async function saveColumnConfig() {
 }
 
 export async function saveIssue(issue) {
-  const payload = {
-    id: issue.id,
-    title: issue.title,
-    status: issue.status,
-    priority: issue.priority,
-    labels: issue.labels,
-    project: issue.project,
-    assignee: issue.assignee,
-    dueDate: issue.dueDate || undefined,
-    remindAt: issue.remindAt || undefined,
-    body: issue.body || '',
-  }
-  const result = await runtime.call('issues.update', payload)
+  const result = await runtime.call('issues.update', issueUpdatePayload(issue))
   if (result?.folderPresent === false) { state.folderPresent = false; return }
   if (result?.id) {
     const merged = normIssue(result)

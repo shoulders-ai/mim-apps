@@ -4,7 +4,7 @@ import { renderList } from './list.js'
 import { renderDetail, initDetailListeners, openDetail, closeDetail, handleDeleteIssue, syncDetailDraftFromDom, startBodyEdit, autoGrow } from './detail.js'
 import { makeNewIssueDraft } from './createDraft.js'
 import { renderCreateModal, handleCreateIssue, initCreateListeners, syncCreateDraftFromDom } from './create.js'
-import { renderFieldMenu, handleFieldSelect, openFieldMenu, initFieldMenuListeners, handleLabelColorChange, commitFieldMenuTextInput } from './fields.js'
+import { renderFieldMenu, handleFieldSelect, openFieldMenu, initFieldMenuListeners, handleLabelColorChange, handleCreateLabel, handleCreateProject } from './fields.js'
 import { renderSettings, handleToggleProp, handleToggleColumn } from './settings.js'
 import { renderToolbar, renderReminderPanel } from './toolbar.js'
 import { renderToast } from './toast.js'
@@ -33,12 +33,16 @@ function renderPage() {
   }
 
   if (state.page === 'detail') {
-    // Re-rendering replaces the textarea; carry focus, caret, and grown
-    // height across, or an open editor snaps back to a clipped box.
+    // Re-rendering replaces the textarea; carry focus, caret, grown height,
+    // and scroll position across, or an open editor snaps back to a clipped
+    // box and the page jumps to the top.
     const prev = qs('#detailBody')
     const hadFocus = prev && document.activeElement === prev
     const caret = hadFocus ? [prev.selectionStart, prev.selectionEnd] : null
+    const scrollTop = qs('.detail-main')?.scrollTop || 0
     content.innerHTML = renderDetail()
+    const scroller = qs('.detail-main')
+    if (scroller) scroller.scrollTop = scrollTop
     const bodyEl = qs('#detailBody')
     if (bodyEl) {
       autoGrow(bodyEl)
@@ -71,7 +75,8 @@ function handleClick(e) {
   if (!target) {
     let changed = false
     if (state.fieldMenu && !e.target.closest('.field-menu')) {
-      commitFieldMenuTextInput({ close: true })
+      state.fieldMenu = null
+      changed = true
     }
     if (state.settingsOpen && !e.target.closest('.settings-popover') && !e.target.closest('[data-action="toggle-settings"]')) {
       state.settingsOpen = false
@@ -93,11 +98,13 @@ function handleClick(e) {
   if (state.deleteConfirmId && action !== 'delete-issue') {
     state.deleteConfirmId = null
   }
-  // open-field/open-new-field commit inside openFieldMenu, after measuring
-  // the trigger rect — committing here re-renders and detaches the trigger.
+  // Dismissing a menu discards pending filter text; creating from it takes
+  // Enter or the explicit Create row. No render here — the trigger must stay
+  // attached for open-field's rect measurement, and every action below
+  // renders on its own.
   if (state.fieldMenu && !e.target.closest('.field-menu')
     && action !== 'open-field' && action !== 'open-new-field') {
-    commitFieldMenuTextInput({ close: true })
+    state.fieldMenu = null
   }
 
   if (action === 'open-detail') {
@@ -130,6 +137,28 @@ function handleClick(e) {
   if (action === 'set-label-color') {
     e.stopPropagation()
     handleLabelColorChange(target.dataset.label, target.dataset.color, target.dataset.id, target.dataset.new)
+    return
+  }
+
+  if (action === 'toggle-label-colors') {
+    e.stopPropagation()
+    if (state.fieldMenu) {
+      const name = target.dataset.label
+      state.fieldMenu.colorPickerFor = state.fieldMenu.colorPickerFor === name ? null : name
+      render()
+    }
+    return
+  }
+
+  if (action === 'create-label') {
+    e.stopPropagation()
+    handleCreateLabel(target)
+    return
+  }
+
+  if (action === 'create-project') {
+    e.stopPropagation()
+    handleCreateProject(target)
     return
   }
 

@@ -160,18 +160,19 @@ export function renderDetail() {
     : '<span class="prop-muted">No reminder</span>'
 
   return `<div class="detail-layout">
-    <div class="detail-center">
-    <article class="detail-main">
-      <input class="detail-title" id="detailTitle" type="text" value="${escapeAttr(issue.title || '')}" placeholder="Issue title...">
+    <div class="detail-main">
+      <article class="detail-main-inner">
+        <input class="detail-title" id="detailTitle" type="text" value="${escapeAttr(issue.title || '')}" placeholder="Issue title...">
 
-      <div class="detail-section">
-        ${renderDescription(issue)}
-      </div>
+        <div class="detail-section">
+          ${renderDescription(issue)}
+        </div>
 
-      <div class="detail-section">
-        <div class="detail-created-line">${escapeHtml(issue.assignee || 'Created')} · ${escapeHtml(relativeTime(issue.created))}</div>
-      </div>
-    </article>
+        <div class="detail-section">
+          <div class="detail-created-line">${escapeHtml(issue.assignee || 'Created')} · ${escapeHtml(relativeTime(issue.created))}</div>
+        </div>
+      </article>
+    </div>
 
     <aside class="detail-sidebar">
       <div class="prop-card">
@@ -183,7 +184,7 @@ export function renderDetail() {
 
       <div class="prop-card">
         <div class="prop-card-title">Labels</div>
-        <button class="prop-row" data-action="open-field" data-field="labels" data-id="${issue.id}">
+        <button class="prop-row prop-row-labels" data-action="open-field" data-field="labels" data-id="${escapeAttr(issue.id)}">
           ${labelsHTML || '<span class="prop-muted">No labels</span>'}
           <span class="prop-add">+</span>
         </button>
@@ -215,7 +216,6 @@ export function renderDetail() {
         </button>
       </div>
     </aside>
-    </div>
   </div>`
 }
 

@@ -1,17 +1,12 @@
-import { state, render, findIssue, showToast } from './state.js'
+import { state, render, findIssue } from './state.js'
 import { STATUSES, STATUS_LABELS, PRIORITIES, PRIORITY_LABELS, LABEL_COLORS, LABEL_COLOR_VALUES } from './constants.js'
-import { ensureBody } from './data.js'
 import { statusToken, priorityBars, icon } from './icons.js'
 import { saveIssue } from './data.js'
 import { escapeAttr, escapeHtml, qs } from './utils.js'
 
 export function openFieldMenu(trigger, field, issueId, isNew = false) {
   const prev = state.fieldMenu
-  // Measure before committing pending menu input: the commit re-renders,
-  // which detaches the clicked trigger and makes its rect read (0,0) —
-  // the menu would then land at the top-left of the window.
   const rect = trigger.getBoundingClientRect()
-  commitFieldMenuTextInput()
   if (prev && prev.field === field && prev.issueId === issueId && prev.isNew === isNew) {
     state.fieldMenu = null
     render()
@@ -19,8 +14,10 @@ export function openFieldMenu(trigger, field, issueId, isNew = false) {
   }
   const width = field === 'priority' ? 180 : 220
   const x = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))
-  const y = Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 300))
-  state.fieldMenu = { field, issueId, isNew, x, y }
+  // Only the horizontal position is clamped here; the vertical clamp happens
+  // in renderFieldMenu once the real menu height is measurable.
+  const y = Math.max(8, rect.bottom + 4)
+  state.fieldMenu = { field, issueId, isNew, x, y, query: '', colorPickerFor: null, focusInput: true }
   render()
 }
 
@@ -48,6 +45,63 @@ function currentValue(field, issueId, isNew) {
     case 'remindAt': return issue.remindAt
     default: return ''
   }
+}
+
+export function sanitizeLabelName(raw) {
+  return String(raw || '').toLowerCase().replace(/[^a-z0-9-_ ]/g, '').trim()
+}
+
+export function rankMatches(names, query) {
+  const q = String(query || '').trim().toLowerCase()
+  if (!q) return [...names].sort((a, b) => a.localeCompare(b))
+  return names
+    .map(name => ({ name, at: name.toLowerCase().indexOf(q) }))
+    .filter(m => m.at !== -1)
+    .sort((a, b) => a.at - b.at || a.name.localeCompare(b.name))
+    .map(m => m.name)
+}
+
+const AUTO_COLORS = LABEL_COLORS.filter(c => c !== 'gray')
+
+export function autoLabelColor(name) {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+  return AUTO_COLORS[h % AUTO_COLORS.length]
+}
+
+export function textCommitDecision(field, visible, query) {
+  const raw = String(query || '').trim()
+  if (field === 'labels') {
+    const name = sanitizeLabelName(raw)
+    if (!name) return { type: 'none' }
+    if (visible.length > 0) return { type: 'toggle', value: visible[0] }
+    return { type: 'create', value: name }
+  }
+  if (field === 'project') {
+    if (!raw) return { type: 'none' }
+    const exact = visible.find(v => v.toLowerCase() === raw.toLowerCase())
+    if (exact) return { type: 'select', value: exact }
+    if (visible.length > 0) return { type: 'select', value: visible[0] }
+    return { type: 'create', value: raw }
+  }
+  return { type: 'none' }
+}
+
+function knownLabels(current) {
+  const known = new Map()
+  for (const issue of state.issues) {
+    for (const l of (issue.labels || [])) {
+      if (!known.has(l.name)) known.set(l.name, l.color || 'gray')
+    }
+  }
+  for (const l of current) {
+    if (!known.has(l.name)) known.set(l.name, l.color || 'gray')
+  }
+  return known
+}
+
+function knownProjects() {
+  return [...new Set(state.issues.map(i => i.project).filter(Boolean))]
 }
 
 function menuItem(field, value, label, visual, selected, issueId, isNew) {
@@ -87,36 +141,53 @@ function assigneeMenuItems(current, issueId, isNew) {
   return items.join('')
 }
 
+function filterInput(field, issueId, isNew, placeholder) {
+  const query = state.fieldMenu?.query || ''
+  const idAttr = field === 'labels' ? 'fmLabelInput' : 'fmProjectInput'
+  return `<input class="fm-input" id="${idAttr}" type="text" placeholder="${placeholder}" autocomplete="off" value="${escapeAttr(query)}" data-field="${field}" data-id="${escapeAttr(issueId || '')}" data-new="${isNew ? '1' : '0'}">`
+}
+
 function projectMenuItems(current, issueId, isNew) {
-  const known = new Set(state.issues.map(i => i.project).filter(Boolean))
+  const query = state.fieldMenu?.query || ''
+  const known = knownProjects()
+  const names = rankMatches(known, query)
   const items = []
-  items.push(`<input class="fm-input" id="fmProjectInput" type="text" placeholder="Type to add project..." autocomplete="off" data-field="project" data-id="${escapeAttr(issueId || '')}" data-new="${isNew ? '1' : '0'}">`)
-  items.push(menuItem('project', '', 'No project',
-    '<span class="fm-icon-muted">–</span>', !current, issueId, isNew))
-  for (const p of [...known].sort()) {
-    items.push(menuItem('project', p, p,
-      icon('folder', 12), p === current, issueId, isNew))
+  if (!query.trim()) {
+    items.push(menuItem('project', '', 'No project',
+      '<span class="fm-icon-muted">–</span>', !current, issueId, isNew))
   }
+  for (const p of names) {
+    items.push(menuItem('project', p, p, icon('folder', 12), p === current, issueId, isNew))
+  }
+  const createName = query.trim()
+  if (createName && !known.some(p => p.toLowerCase() === createName.toLowerCase())) {
+    items.push(`<button class="fm-item fm-create" data-action="create-project" data-value="${escapeAttr(createName)}" data-id="${escapeAttr(issueId || '')}" data-new="${isNew ? '1' : '0'}">${icon('plus', 12)}<span class="fm-item-label">Create "${escapeHtml(createName)}"</span></button>`)
+  }
+  if (items.length === 0) items.push('<div class="fm-empty">No matches</div>')
   return items.join('')
 }
 
 function labelMenuItems(currentLabels, issueId, isNew) {
   const current = Array.isArray(currentLabels) ? currentLabels : []
   const currentNames = new Set(current.map(l => l.name))
-  const known = new Map()
-  for (const issue of state.issues) {
-    for (const l of (issue.labels || [])) {
-      if (!known.has(l.name)) known.set(l.name, l.color || 'gray')
-    }
-  }
+  const known = knownLabels(current)
+  const query = state.fieldMenu?.query || ''
+  const names = rankMatches([...known.keys()], query)
+  const openPicker = state.fieldMenu?.colorPickerFor
+
   const items = []
-  items.push(`<input class="fm-input" id="fmLabelInput" type="text" placeholder="Type to add label..." autocomplete="off" data-field="labels" data-id="${escapeAttr(issueId || '')}" data-new="${isNew ? '1' : '0'}">`)
-  items.push(menuItem('labels', '', 'No labels',
-    '<span class="fm-icon-muted">–</span>', current.length === 0, issueId, isNew))
-  for (const [name, color] of [...known].sort((a, b) => a[0].localeCompare(b[0]))) {
+  if (!query.trim()) {
+    items.push(menuItem('labels', '', 'No labels',
+      '<span class="fm-icon-muted">–</span>', current.length === 0, issueId, isNew))
+  }
+  for (const name of names) {
+    const color = known.get(name) || 'gray'
     const dot = `<span class="label-dot" style="background:${LABEL_COLOR_VALUES[color] || LABEL_COLOR_VALUES.gray}"></span>`
-    items.push(menuItem('labels', name, name, dot, currentNames.has(name), issueId, isNew))
-    if (currentNames.has(name)) {
+    items.push(`<div class="fm-row">
+      ${menuItem('labels', name, name, dot, currentNames.has(name), issueId, isNew)}
+      <button class="fm-dots${openPicker === name ? ' open' : ''}" data-action="toggle-label-colors" data-label="${escapeAttr(name)}" title="Change color">${icon('dots', 13)}</button>
+    </div>`)
+    if (openPicker === name) {
       const swatches = LABEL_COLORS.map(c => {
         const active = c === color ? ' active' : ''
         return `<button class="fm-color-dot${active}" data-action="set-label-color" data-label="${escapeAttr(name)}" data-color="${c}" data-id="${escapeAttr(issueId || '')}" data-new="${isNew ? '1' : '0'}"><span style="background:${LABEL_COLOR_VALUES[c]}"></span></button>`
@@ -124,6 +195,12 @@ function labelMenuItems(currentLabels, issueId, isNew) {
       items.push(`<div class="fm-colors">${swatches}</div>`)
     }
   }
+  const createName = sanitizeLabelName(query)
+  if (createName && ![...known.keys()].some(n => n.toLowerCase() === createName)) {
+    const dot = `<span class="label-dot" style="background:${LABEL_COLOR_VALUES[autoLabelColor(createName)]}"></span>`
+    items.push(`<button class="fm-item fm-create" data-action="create-label" data-value="${escapeAttr(createName)}" data-id="${escapeAttr(issueId || '')}" data-new="${isNew ? '1' : '0'}">${dot}<span class="fm-item-label">Create "${escapeHtml(createName)}"</span></button>`)
+  }
+  if (items.length === 0) items.push('<div class="fm-empty">No matches</div>')
   return items.join('')
 }
 
@@ -186,49 +263,123 @@ export function renderFieldMenu() {
   const { field, issueId, isNew, x, y } = state.fieldMenu
   const cv = currentValue(field, issueId, isNew)
 
+  // Re-rendering replaces the filter input; carry focus and caret across so
+  // periodic global renders never interrupt typing.
+  const prevInput = qs('.field-menu .fm-input')
+  const hadFocus = Boolean(prevInput && document.activeElement === prevInput)
+  const caret = hadFocus ? prevInput.selectionStart : null
+
   let title = 'Set property'
+  let head = ''
   let rows = ''
   let width = 220
   switch (field) {
     case 'status': title = 'Status'; rows = statusMenuItems(cv, issueId, isNew); break
     case 'priority': title = 'Priority'; rows = priorityMenuItems(cv, issueId, isNew); width = 180; break
     case 'assignee': title = 'Assignee'; rows = assigneeMenuItems(cv, issueId, isNew); break
-    case 'project': title = 'Project'; rows = projectMenuItems(cv, issueId, isNew); break
-    case 'labels': title = 'Labels'; rows = labelMenuItems(cv, issueId, isNew); break
+    case 'project':
+      title = 'Project'
+      head = filterInput('project', issueId, isNew, 'Set project...')
+      rows = projectMenuItems(cv, issueId, isNew)
+      break
+    case 'labels':
+      title = 'Labels'
+      head = filterInput('labels', issueId, isNew, 'Add labels...')
+      rows = labelMenuItems(cv, issueId, isNew)
+      width = 240
+      break
     case 'dueDate': title = 'Due date'; rows = dueDateMenuItems(cv, issueId, isNew); break
     case 'remindAt': title = 'Remind me'; rows = remindAtMenuItems(cv, issueId); break
   }
 
   container.innerHTML = `<div class="field-menu" style="left:${x}px;top:${y}px;width:${width}px">
     <div class="fm-title">${title}</div>
-    ${rows}
+    ${head}
+    <div class="fm-scroll">${rows}</div>
   </div>`
+
+  const menu = container.firstElementChild
+  if (menu) {
+    const maxTop = window.innerHeight - menu.offsetHeight - 8
+    if (y > maxTop) menu.style.top = Math.max(8, maxTop) + 'px'
+  }
+
+  const input = qs('.field-menu .fm-input')
+  if (input && (hadFocus || state.fieldMenu.focusInput)) {
+    input.focus()
+    const pos = caret ?? input.value.length
+    input.setSelectionRange(pos, pos)
+  }
+  state.fieldMenu.focusInput = false
+}
+
+function labelColorFor(name) {
+  return knownLabels([]).get(name) || autoLabelColor(name)
+}
+
+function applyLabelToggle(name, issueId, isNew) {
+  if (isNew) {
+    const existing = state.newIssue.labels || []
+    state.newIssue.labels = existing.some(l => l.name === name)
+      ? existing.filter(l => l.name !== name)
+      : [...existing, { name, color: labelColorFor(name) }]
+    return
+  }
+  const issue = findIssue(issueId)
+  if (!issue) return
+  const existing = issue.labels || []
+  issue.labels = existing.some(l => l.name === name)
+    ? existing.filter(l => l.name !== name)
+    : [...existing, { name, color: labelColorFor(name) }]
+  issue.tags = issue.labels.map(l => l.name)
+  saveIssue(issue)
+}
+
+function applyLabelCreate(name, issueId, isNew) {
+  if (isNew) {
+    const existing = state.newIssue.labels || []
+    if (!existing.some(l => l.name === name)) {
+      state.newIssue.labels = [...existing, { name, color: labelColorFor(name) }]
+    }
+    return
+  }
+  const issue = findIssue(issueId)
+  if (!issue) return
+  if (!(issue.labels || []).some(l => l.name === name)) {
+    issue.labels = [...(issue.labels || []), { name, color: labelColorFor(name) }]
+    issue.tags = issue.labels.map(l => l.name)
+    saveIssue(issue)
+  }
 }
 
 export function handleFieldSelect(target) {
-  const { field, value, id, new: isNew } = target.dataset
-  if (isNew === '1') {
+  const { field, value, id, new: isNewFlag } = target.dataset
+  const isNew = isNewFlag === '1'
+
+  if (field === 'labels') {
+    if (!value) {
+      if (isNew) {
+        state.newIssue.labels = []
+      } else {
+        const issue = findIssue(id)
+        if (issue) {
+          issue.labels = []
+          issue.tags = []
+          saveIssue(issue)
+        }
+      }
+    } else {
+      applyLabelToggle(value, id, isNew)
+    }
+    render()
+    return
+  }
+
+  if (isNew) {
     if (field === 'status') state.newIssue.status = value
     if (field === 'priority') state.newIssue.priority = value
     if (field === 'assignee') state.newIssue.assignee = value
     if (field === 'project') state.newIssue.project = value
-    if (field === 'labels') {
-      if (!value) {
-        state.newIssue.labels = []
-      } else {
-        const existing = state.newIssue.labels || []
-        const hasIt = existing.some(l => l.name === value)
-        if (hasIt) {
-          state.newIssue.labels = existing.filter(l => l.name !== value)
-        } else {
-          const known = new Map()
-          for (const issue of state.issues) {
-            for (const l of (issue.labels || [])) known.set(l.name, l.color)
-          }
-          state.newIssue.labels = [...existing, { name: value, color: known.get(value) || 'gray' }]
-        }
-      }
-    }
   } else {
     const issue = findIssue(id)
     if (!issue) return
@@ -243,81 +394,68 @@ export function handleFieldSelect(target) {
         state.firedReminders = state.firedReminders.filter(r => r.id !== id)
       }
     }
-    if (field === 'labels') {
-      if (!value) {
-        issue.labels = []
-        issue.tags = []
-      } else {
-        const hasIt = (issue.labels || []).some(l => l.name === value)
-        if (hasIt) {
-          issue.labels = issue.labels.filter(l => l.name !== value)
-        } else {
-          const known = new Map()
-          for (const other of state.issues) {
-            for (const l of (other.labels || [])) known.set(l.name, l.color)
-          }
-          issue.labels = [...(issue.labels || []), { name: value, color: known.get(value) || 'gray' }]
-        }
-        issue.tags = issue.labels.map(l => l.name)
-      }
-    }
     saveIssue(issue)
   }
-  if (field !== 'labels') state.fieldMenu = null
+  state.fieldMenu = null
   render()
 }
 
-function handleTextInput(input, field, issueId, isNew) {
-  const value = input.value.trim()
-  if (!value) return false
+export function handleCreateLabel(target) {
+  const name = sanitizeLabelName(target.dataset.value)
+  if (!name) return
+  applyLabelCreate(name, target.dataset.id, target.dataset.new === '1')
+  render()
+}
 
-  if (field === 'project') {
-    if (isNew === '1') {
-      state.newIssue.project = value
-    } else {
-      const issue = findIssue(issueId)
-      if (issue) { issue.project = value; saveIssue(issue) }
+export function handleCreateProject(target) {
+  const name = String(target.dataset.value || '').trim()
+  if (!name) return
+  if (target.dataset.new === '1') {
+    state.newIssue.project = name
+  } else {
+    const issue = findIssue(target.dataset.id)
+    if (issue) {
+      issue.project = name
+      saveIssue(issue)
     }
-    state.fieldMenu = null
-    render()
-    return true
   }
+  state.fieldMenu = null
+  render()
+}
+
+function commitMenuText(input) {
+  const field = input.dataset.field
+  const issueId = input.dataset.id
+  const isNew = input.dataset.new === '1'
+  const query = input.value
 
   if (field === 'labels') {
-    const labelName = value.toLowerCase().replace(/[^a-z0-9-_ ]/g, '').trim()
-    if (!labelName) return false
-    if (isNew === '1') {
-      const existing = state.newIssue.labels || []
-      if (!existing.some(l => l.name === labelName)) {
-        state.newIssue.labels = [...existing, { name: labelName, color: 'gray' }]
-      }
+    const current = currentValue('labels', issueId, isNew)
+    const known = knownLabels(Array.isArray(current) ? current : [])
+    const visible = rankMatches([...known.keys()], query)
+    const decision = textCommitDecision('labels', visible, query)
+    if (decision.type === 'toggle') applyLabelToggle(decision.value, issueId, isNew)
+    if (decision.type === 'create') applyLabelCreate(decision.value, issueId, isNew)
+    if (decision.type !== 'none') render()
+    return
+  }
+
+  if (field === 'project') {
+    const visible = rankMatches(knownProjects(), query)
+    const decision = textCommitDecision('project', visible, query)
+    if (decision.type === 'none') return
+    if (isNew) {
+      state.newIssue.project = decision.value
     } else {
       const issue = findIssue(issueId)
       if (issue) {
-        if (!(issue.labels || []).some(l => l.name === labelName)) {
-          issue.labels = [...(issue.labels || []), { name: labelName, color: 'gray' }]
-          issue.tags = issue.labels.map(l => l.name)
-          saveIssue(issue)
-        }
+        issue.project = decision.value
+        saveIssue(issue)
       }
     }
-    input.value = ''
-    render()
-    return true
-  }
-  return false
-}
-
-export function commitFieldMenuTextInput({ close = false } = {}) {
-  const input = qs('.field-menu .fm-input')
-  const committed = input
-    ? handleTextInput(input, input.dataset.field, input.dataset.id, input.dataset.new)
-    : false
-  if (close && state.fieldMenu) {
     state.fieldMenu = null
     render()
   }
-  return committed
 }
 
 function handleDateInput(input, issueId, isNew) {
@@ -335,10 +473,24 @@ function handleDateInput(input, issueId, isNew) {
 export function initFieldMenuListeners() {
   document.addEventListener('keydown', (e) => {
     const input = e.target
-    if (e.key === 'Enter' && input.classList?.contains('fm-input')) {
-      e.preventDefault()
-      handleTextInput(input, input.dataset.field, input.dataset.id, input.dataset.new)
-      return
+    if (input.classList?.contains('fm-input')) {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        commitMenuText(input)
+        return
+      }
+      // Escape clears the filter first; a second Escape closes the menu via
+      // the global shortcut handler.
+      if (e.key === 'Escape' && input.value) {
+        e.stopImmediatePropagation()
+        input.value = ''
+        if (state.fieldMenu) {
+          state.fieldMenu.query = ''
+          state.fieldMenu.focusInput = true
+          renderFieldMenu()
+        }
+        return
+      }
     }
 
     if (!state.fieldMenu) return
@@ -363,7 +515,25 @@ export function initFieldMenuListeners() {
         e.preventDefault()
         focused.click()
       }
+      return
     }
+
+    // Typing while an option row is focused routes back into the filter
+    // input, so filtering continues seamlessly after arrow-key navigation.
+    if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      const filterEl = menu.querySelector('.fm-input')
+      const active = document.activeElement
+      if (filterEl && active !== filterEl && !['INPUT', 'TEXTAREA'].includes(active?.tagName)) {
+        filterEl.focus()
+      }
+    }
+  })
+
+  document.addEventListener('input', (e) => {
+    if (!state.fieldMenu) return
+    if (!e.target.classList?.contains('fm-input')) return
+    state.fieldMenu.query = e.target.value
+    renderFieldMenu()
   })
 
   document.addEventListener('change', (e) => {
@@ -373,21 +543,19 @@ export function initFieldMenuListeners() {
   })
 }
 
-export async function handleLabelColorChange(labelName, newColor, issueId, isNew) {
+export function handleLabelColorChange(labelName, newColor, issueId, isNew) {
   if (isNew === '1' || isNew === true) {
-    const labels = state.newIssue.labels || []
-    const label = labels.find(l => l.name === labelName)
+    const label = (state.newIssue.labels || []).find(l => l.name === labelName)
     if (label) label.color = newColor
   }
   for (const issue of state.issues) {
-    const labels = issue.labels || []
-    const label = labels.find(l => l.name === labelName)
+    const label = (issue.labels || []).find(l => l.name === labelName)
     if (label) {
       label.color = newColor
-      await ensureBody(issue)
-      await saveIssue(issue)
+      saveIssue(issue)
     }
   }
+  if (state.fieldMenu) state.fieldMenu.colorPickerFor = null
   render()
 }
 
