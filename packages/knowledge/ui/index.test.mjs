@@ -194,4 +194,34 @@ describe('Knowledge UI contract', () => {
     const html = source()
     expect(html).toContain('prefers-reduced-motion')
   })
+
+  it('offers board and timeline projections alongside list and graph', () => {
+    const html = source()
+    const js = script()
+
+    expect(html).toContain('id="viewBoard"')
+    expect(html).toContain('id="viewTimeline"')
+    expect(js).toContain('function renderBoard()')
+    expect(js).toContain('function renderTimeline()')
+    // Both views reuse the shared filter pipeline instead of refetching.
+    expect(js.match(/getFilteredEntries\(\)/g).length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('groups the board by frontmatter status with known columns first', () => {
+    const js = script()
+
+    expect(js).toContain('const STATUS_ORDER')
+    expect(js).toContain('function statusOf(')
+    // Unknown statuses must still get a column, not disappear.
+    expect(js).toContain("filter(status => !STATUS_ORDER.includes(status)).sort()")
+  })
+
+  it('scales timeline staleness bars against a bounded window', () => {
+    const js = script()
+
+    expect(js).toContain('const TIMELINE_MAX_DAYS')
+    expect(js).toContain('function daysSince(')
+    // Entries without any date must be excluded, not rendered as fresh.
+    expect(js).toContain('row.days !== null')
+  })
 })

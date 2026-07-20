@@ -13,6 +13,14 @@
       --type-record:  #9c5bb5;
       --type-note:    var(--color-ink-3);
       --type-missing: var(--color-ink-4);
+
+      --status-contracting:   #4a8bc2;
+      --status-active:        #2e8b7a;
+      --status-waiting:       #c49520;
+      --status-paused:        #9c5bb5;
+      --status-pipeline-warm: #c47a3d;
+      --status-pipeline-cold: #7a8b99;
+      --status-other:         var(--color-ink-3);
     }
 
     /* ── Layout ── */
@@ -1091,6 +1099,184 @@
       color: var(--color-ink-4);
     }
 
+    /* ── Board View ── */
+    .board {
+      display: flex;
+      gap: var(--space-md);
+      align-items: flex-start;
+      height: 100%;
+      overflow-x: auto;
+      padding-bottom: var(--space-sm);
+    }
+    .board-col {
+      flex: 0 0 232px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      max-height: 100%;
+      background: var(--color-chrome);
+      border: 1px solid var(--color-rule-light);
+      border-radius: var(--radius-lg);
+    }
+    .board-col-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 10px;
+      flex-shrink: 0;
+    }
+    .board-col-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--status-other);
+      flex-shrink: 0;
+    }
+    .board-col-name {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--color-ink-2);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .board-col-count {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--color-ink-4);
+      margin-left: auto;
+    }
+    .board-col-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 0 6px 6px;
+      overflow-y: auto;
+      min-height: 8px;
+    }
+    .board-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-rule-light);
+      border-left: 3px solid var(--color-rule-light);
+      border-radius: var(--radius-md);
+      padding: 8px 10px;
+      cursor: default;
+      transition: background 0.1s;
+      outline: none;
+    }
+    .board-card:hover { background: var(--color-chrome-high); }
+    .board-card:focus-visible {
+      box-shadow: 0 0 0 2px var(--color-accent);
+      border-color: var(--color-accent);
+    }
+    .board-card[data-type="person"]  { border-left-color: var(--type-person); }
+    .board-card[data-type="org"]     { border-left-color: var(--type-org); }
+    .board-card[data-type="project"] { border-left-color: var(--type-project); }
+    .board-card[data-type="record"]  { border-left-color: var(--type-record); }
+    .board-card[data-type="note"]    { border-left-color: var(--type-note); }
+    .board-card-title {
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-ink);
+      line-height: 1.35;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+    .board-card-meta {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin-top: 4px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--color-ink-3);
+    }
+    .board-card-age { margin-left: auto; color: var(--color-ink-4); }
+    .board-card-age--stale { color: var(--status-waiting); }
+
+    /* ── Timeline View ── */
+    .timeline { max-width: 860px; }
+    .timeline-axis {
+      display: flex;
+      margin-left: calc(200px + 92px + 2 * var(--space-sm));
+      margin-right: calc(44px + var(--space-sm));
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--color-ink-4);
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--color-rule-light);
+      margin-bottom: 6px;
+    }
+    .timeline-axis span { flex: 1; }
+    .timeline-axis span:last-child { flex: 0; }
+    .timeline-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: 3px 0;
+      border-radius: var(--radius-sm);
+      cursor: default;
+      outline: none;
+    }
+    .timeline-row:hover { background: var(--color-chrome-high); }
+    .timeline-row:focus-visible { box-shadow: 0 0 0 2px var(--color-accent); }
+    .timeline-label {
+      flex: 0 0 200px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+    .timeline-type-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .timeline-title {
+      font-family: var(--font-sans);
+      font-size: 11.5px;
+      color: var(--color-ink);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .timeline-status {
+      flex: 0 0 92px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      text-transform: uppercase;
+      color: var(--color-ink-3);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .timeline-track {
+      flex: 1;
+      height: 8px;
+      background: var(--color-chrome);
+      border-radius: 100px;
+      overflow: hidden;
+    }
+    .timeline-bar {
+      height: 100%;
+      border-radius: 100px;
+      background: var(--status-other);
+      min-width: 3px;
+    }
+    .timeline-age {
+      flex: 0 0 44px;
+      text-align: right;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--color-ink-3);
+    }
+
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
         animation-duration: 0.01ms !important;
@@ -1107,6 +1293,8 @@
   <div class="sort-toggle" id="sortToggle" title="Toggle sort order">Newest</div>
   <div class="view-toggle" aria-label="View mode">
     <button class="view-toggle-btn view-toggle-btn--active" id="viewList" type="button">List</button>
+    <button class="view-toggle-btn" id="viewBoard" type="button">Board</button>
+    <button class="view-toggle-btn" id="viewTimeline" type="button">Timeline</button>
     <button class="view-toggle-btn" id="viewGraph" type="button">Graph</button>
   </div>
   <span class="toolbar-spacer"></span>
@@ -1626,6 +1814,8 @@ const loadingEl = document.getElementById('loadingMsg')
 const sortToggleEl = document.getElementById('sortToggle')
 const typeFilterEl = document.getElementById('typeFilter')
 const viewListEl = document.getElementById('viewList')
+const viewBoardEl = document.getElementById('viewBoard')
+const viewTimelineEl = document.getElementById('viewTimeline')
 const viewGraphEl = document.getElementById('viewGraph')
 const overlayEl = document.getElementById('overlay')
 const detailEl = document.getElementById('detail')
@@ -1643,6 +1833,8 @@ function render() {
   renderViewToggle()
   renderEntryCount()
   if (viewMode === 'graph') renderGraph()
+  else if (viewMode === 'board') renderBoard()
+  else if (viewMode === 'timeline') renderTimeline()
   else renderCards()
   sortToggleEl.textContent = sortMode === 'date' ? 'Newest' : 'A-Z'
 }
@@ -1804,6 +1996,8 @@ function renderTypeFilter() {
 
 function renderViewToggle() {
   viewListEl.classList.toggle('view-toggle-btn--active', viewMode === 'list')
+  viewBoardEl.classList.toggle('view-toggle-btn--active', viewMode === 'board')
+  viewTimelineEl.classList.toggle('view-toggle-btn--active', viewMode === 'timeline')
   viewGraphEl.classList.toggle('view-toggle-btn--active', viewMode === 'graph')
 }
 
@@ -1893,6 +2087,145 @@ function moveCardFocus(dx, dy) {
     }
     if (best !== null) cards[best].focus()
   }
+}
+
+// ── Board ──
+
+const STATUS_ORDER = ['contracting', 'active', 'waiting', 'paused', 'pipeline-warm', 'pipeline-cold']
+const BOARD_STALE_DAYS = 21
+const TIMELINE_MAX_DAYS = 90
+
+function statusOf(entry) {
+  const value = entry.extra && entry.extra.status
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function statusColor(status) {
+  return STATUS_ORDER.includes(status) ? `var(--status-${status})` : 'var(--status-other)'
+}
+
+function daysSince(entry) {
+  const iso = entry.updated || entry.created
+  if (!iso) return null
+  const ms = Date.now() - new Date(iso).getTime()
+  if (!Number.isFinite(ms)) return null
+  return Math.max(0, Math.floor(ms / 86400000))
+}
+
+function ageLabel(days) {
+  if (days === null) return ''
+  if (days === 0) return 'today'
+  if (days < 30) return `${days}d`
+  if (days < 365) return `${Math.floor(days / 30)}mo`
+  return `${Math.floor(days / 365)}y`
+}
+
+function bindEntryOpen(selector) {
+  contentEl.querySelectorAll(selector).forEach(el => {
+    el.addEventListener('click', () => openDetail(el.dataset.id))
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') openDetail(el.dataset.id)
+    })
+  })
+}
+
+function renderBoard() {
+  const filtered = getFilteredEntries().filter(entry => statusOf(entry))
+
+  if (filtered.length === 0) {
+    contentEl.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📋</div>
+        <div class="empty-title">No entries with a status</div>
+        <div class="empty-sub">The board groups entries by their <code>status</code> frontmatter field (e.g. active, waiting, pipeline-warm). ${searchQuery || activeTag || activeType ? 'Filters are also applied — try clearing them.' : 'Set a status on a project to see it here.'}</div>
+      </div>
+    `
+    return
+  }
+
+  const groups = new Map()
+  for (const entry of filtered) {
+    const status = statusOf(entry)
+    if (!groups.has(status)) groups.set(status, [])
+    groups.get(status).push(entry)
+  }
+  const order = [
+    ...STATUS_ORDER.filter(status => groups.has(status)),
+    ...[...groups.keys()].filter(status => !STATUS_ORDER.includes(status)).sort(),
+  ]
+
+  contentEl.innerHTML = `<div class="board">${order.map(status => `
+    <div class="board-col">
+      <div class="board-col-header">
+        <span class="board-col-dot" style="background:${statusColor(status)}"></span>
+        <span class="board-col-name" title="${escapeAttr(status)}">${escapeHtml(status)}</span>
+        <span class="board-col-count">${groups.get(status).length}</span>
+      </div>
+      <div class="board-col-cards">${groups.get(status).map(renderBoardCardHTML).join('')}</div>
+    </div>
+  `).join('')}</div>`
+
+  bindEntryOpen('.board-card')
+}
+
+function renderBoardCardHTML(entry) {
+  const days = daysSince(entry)
+  const domain = entry.extra && typeof entry.extra.domain === 'string' ? entry.extra.domain : ''
+  const stale = days !== null && days >= BOARD_STALE_DAYS
+  return `
+    <div class="board-card" data-id="${entry.id}" data-type="${escapeHtml(entry.type || 'note')}" tabindex="0">
+      <div class="board-card-title">${escapeHtml(entry.title || '(untitled)')}</div>
+      <div class="board-card-meta">
+        <span>${escapeHtml(domain || entry.type || 'note')}</span>
+        <span class="board-card-age ${stale ? 'board-card-age--stale' : ''}" title="last touched">${ageLabel(days)}</span>
+      </div>
+    </div>
+  `
+}
+
+// ── Timeline ──
+
+function renderTimeline() {
+  const rows = getFilteredEntries()
+    .map(entry => ({ entry, days: daysSince(entry) }))
+    .filter(row => row.days !== null)
+    .sort((a, b) => b.days - a.days)
+
+  if (rows.length === 0) {
+    contentEl.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📚</div>
+        <div class="empty-title">No matching entries</div>
+        <div class="empty-sub">Try different search terms or clear the filter.</div>
+      </div>
+    `
+    return
+  }
+
+  contentEl.innerHTML = `
+    <div class="timeline">
+      <div class="timeline-axis"><span>0d</span><span>30d</span><span>60d</span><span>90d+</span></div>
+      ${rows.map(({ entry, days }) => {
+        const status = statusOf(entry)
+        const width = Math.max(2, Math.min(days, TIMELINE_MAX_DAYS) / TIMELINE_MAX_DAYS * 100)
+        return `
+          <div class="timeline-row" data-id="${entry.id}" tabindex="0">
+            <div class="timeline-label">
+              <span class="timeline-type-dot" style="background:${graphColor(entry.type)}"></span>
+              <span class="timeline-title" title="${escapeAttr(entry.title || entry.id)}">${escapeHtml(entry.title || '(untitled)')}</span>
+            </div>
+            <span class="timeline-status" title="${escapeAttr(status)}">${escapeHtml(status)}</span>
+            <div class="timeline-track">
+              <div class="timeline-bar" style="width:${width}%;background:${status ? statusColor(status) : 'var(--status-other)'}"></div>
+            </div>
+            <span class="timeline-age" title="days since last update">${ageLabel(days)}</span>
+          </div>
+        `
+      }).join('')}
+    </div>
+  `
+
+  bindEntryOpen('.timeline-row')
 }
 
 // ── Graph ──
@@ -2644,6 +2977,8 @@ newTitleEl.addEventListener('keydown', (e) => {
 
 sortToggleEl.addEventListener('click', () => { sortMode = sortMode === 'date' ? 'alpha' : 'date'; render() })
 viewListEl.addEventListener('click', () => { viewMode = 'list'; render() })
+viewBoardEl.addEventListener('click', () => { viewMode = 'board'; render() })
+viewTimelineEl.addEventListener('click', () => { viewMode = 'timeline'; render() })
 viewGraphEl.addEventListener('click', () => { viewMode = 'graph'; render() })
 typeFilterEl.addEventListener('change', (e) => { activeType = e.target.value; render() })
 
