@@ -17,7 +17,9 @@
       --status-contracting:   #4a8bc2;
       --status-active:        #2e8b7a;
       --status-waiting:       #c49520;
+      --status-review:        #7a6bc2;
       --status-paused:        #9c5bb5;
+      --status-done:          #5a9a6f;
       --status-pipeline-warm: #c47a3d;
       --status-pipeline-cold: #7a8b99;
       --status-other:         var(--color-ink-3);
@@ -1124,7 +1126,12 @@
       gap: 6px;
       padding: 8px 10px;
       flex-shrink: 0;
+      cursor: grab;
+      user-select: none;
     }
+    .board-col--dragging { opacity: 0.65; }
+    body.board-dragging { user-select: none; cursor: grabbing; }
+    body.board-dragging .board-col-header { cursor: grabbing; }
     .board-col-dot {
       width: 7px;
       height: 7px;
@@ -2091,9 +2098,32 @@ function moveCardFocus(dx, dy) {
 
 // ── Board ──
 
-const STATUS_ORDER = ['contracting', 'active', 'waiting', 'paused', 'pipeline-warm', 'pipeline-cold']
+// Canonical fallback ordering (roughly lifecycle order) with a color per
+// status. Key order defines STATUS_ORDER. A workspace-specific order dragged
+// by the user overrides this; see boardColumnOrder().
+const STATUS_COLORS = {
+  'backlog': 'var(--status-other)',
+  'todo': 'var(--status-other)',
+  'to-do': 'var(--status-other)',
+  'pipeline-cold': 'var(--status-pipeline-cold)',
+  'pipeline-warm': 'var(--status-pipeline-warm)',
+  'contracting': 'var(--status-contracting)',
+  'active': 'var(--status-active)',
+  'in-progress': 'var(--status-active)',
+  'ongoing': 'var(--status-active)',
+  'waiting': 'var(--status-waiting)',
+  'review': 'var(--status-review)',
+  'paused': 'var(--status-paused)',
+  'done': 'var(--status-done)',
+  'archived': 'var(--status-other)',
+}
+const STATUS_ORDER = Object.keys(STATUS_COLORS)
+const BOARD_ORDER_KEY = 'board.statusOrder'
 const BOARD_STALE_DAYS = 21
 const TIMELINE_MAX_DAYS = 90
+
+let boardOrder = null
+let boardOrderLoaded = false
 
 function statusOf(entry) {
   const value = entry.extra && entry.extra.status
@@ -2101,7 +2131,46 @@ function statusOf(entry) {
 }
 
 function statusColor(status) {
-  return STATUS_ORDER.includes(status) ? `var(--status-${status})` : 'var(--status-other)'
+  return STATUS_COLORS[status] || 'var(--status-other)'
+}
+
+async function ensureBoardOrder() {
+  if (boardOrderLoaded) return
+  boardOrderLoaded = true
+  try {
+    const stored = await runtime.call('package.data.kv.get', { key: BOARD_ORDER_KEY })
+    const value = Array.isArray(stored) ? stored
+      : stored && Array.isArray(stored.value) ? stored.value
+      : null
+    if (value && value.every(status => typeof status === 'string')) {
+      boardOrder = value
+      if (viewMode === 'board') render()
+    }
+  } catch (err) {
+    console.warn('[knowledge] board order load error:', err)
+  }
+}
+
+async function saveBoardOrder(order) {
+  boardOrder = order
+  try {
+    await runtime.call('package.data.kv.set', { key: BOARD_ORDER_KEY, value: order })
+  } catch (err) {
+    console.warn('[knowledge] board order save error:', err)
+  }
+}
+
+function boardColumnOrder(statuses) {
+  const present = new Set(statuses)
+  const ordered = []
+  const seen = new Set()
+  const take = (status) => {
+    if (present.has(status) && !seen.has(status)) { ordered.push(status); seen.add(status) }
+  }
+  for (const status of boardOrder || []) take(status)
+  for (const status of STATUS_ORDER) take(status)
+  for (const status of [...present].filter(status => !seen.has(status)).sort()) take(status)
+  return ordered
 }
 
 function daysSince(entry) {
@@ -2143,20 +2212,19 @@ function renderBoard() {
     return
   }
 
+  ensureBoardOrder()
+
   const groups = new Map()
   for (const entry of filtered) {
     const status = statusOf(entry)
     if (!groups.has(status)) groups.set(status, [])
     groups.get(status).push(entry)
   }
-  const order = [
-    ...STATUS_ORDER.filter(status => groups.has(status)),
-    ...[...groups.keys()].filter(status => !STATUS_ORDER.includes(status)).sort(),
-  ]
+  const order = boardColumnOrder([...groups.keys()])
 
   contentEl.innerHTML = `<div class="board">${order.map(status => `
-    <div class="board-col">
-      <div class="board-col-header">
+    <div class="board-col" data-status="${escapeAttr(status)}">
+      <div class="board-col-header" title="Drag to reorder columns">
         <span class="board-col-dot" style="background:${statusColor(status)}"></span>
         <span class="board-col-name" title="${escapeAttr(status)}">${escapeHtml(status)}</span>
         <span class="board-col-count">${groups.get(status).length}</span>
@@ -2166,6 +2234,52 @@ function renderBoard() {
   `).join('')}</div>`
 
   bindEntryOpen('.board-card')
+  bindBoardDrag()
+}
+
+function bindBoardDrag() {
+  const boardEl = contentEl.querySelector('.board')
+  if (!boardEl) return
+  boardEl.querySelectorAll('.board-col-header').forEach(header => {
+    header.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return
+      startBoardDrag(e, header.closest('.board-col'), boardEl)
+    })
+  })
+}
+
+function startBoardDrag(e, col, boardEl) {
+  const startX = e.clientX
+  const startY = e.clientY
+  let dragging = false
+
+  const onMove = (ev) => {
+    if (!dragging) {
+      if (Math.abs(ev.clientX - startX) < 5 && Math.abs(ev.clientY - startY) < 5) return
+      dragging = true
+      col.classList.add('board-col--dragging')
+      document.body.classList.add('board-dragging')
+    }
+    for (const other of boardEl.querySelectorAll('.board-col')) {
+      if (other === col) continue
+      const rect = other.getBoundingClientRect()
+      const mid = rect.left + rect.width / 2
+      const colLeft = col.getBoundingClientRect().left
+      if (colLeft < rect.left && ev.clientX > mid) { other.after(col); break }
+      if (colLeft > rect.left && ev.clientX < mid) { other.before(col); break }
+    }
+  }
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    if (!dragging) return
+    col.classList.remove('board-col--dragging')
+    document.body.classList.remove('board-dragging')
+    saveBoardOrder([...boardEl.querySelectorAll('.board-col')].map(c => c.dataset.status))
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+  e.preventDefault()
 }
 
 function renderBoardCardHTML(entry) {

@@ -212,8 +212,24 @@ describe('Knowledge UI contract', () => {
 
     expect(js).toContain('const STATUS_ORDER')
     expect(js).toContain('function statusOf(')
+    expect(js).toContain('function boardColumnOrder(')
     // Unknown statuses must still get a column, not disappear.
-    expect(js).toContain("filter(status => !STATUS_ORDER.includes(status)).sort()")
+    expect(js).toContain('filter(status => !seen.has(status)).sort()')
+    // Every canonical status must resolve to a color token.
+    expect(js).toContain('const STATUS_COLORS')
+    expect(js).toContain('STATUS_ORDER = Object.keys(STATUS_COLORS)')
+  })
+
+  it('persists a user-dragged column order in app KV storage', () => {
+    const js = script()
+
+    expect(js).toContain("runtime.call('package.data.kv.get', { key: BOARD_ORDER_KEY })")
+    expect(js).toContain("runtime.call('package.data.kv.set', { key: BOARD_ORDER_KEY, value: order })")
+    expect(js).toContain('function startBoardDrag(')
+    // The stored order wins; canonical order is only a fallback.
+    expect(js).toContain('for (const status of boardOrder || []) take(status)')
+    // A failed KV read must not break the board.
+    expect(js).toContain('board order load error')
   })
 
   it('scales timeline staleness bars against a bounded window', () => {
