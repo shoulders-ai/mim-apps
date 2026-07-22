@@ -38,7 +38,15 @@ const NAMED_KEYS = {
 export async function discoverTools() {
   const runtime = await rt()
   const res = await runtime.call('package.capabilities.list', {})
-  const entries = res?.tools || res?.capabilities || (Array.isArray(res) ? res : [])
+  state.tools = toolMapFromCapabilities(res)
+}
+
+// The live shape is { packages: [{ packageId, tools: [...] }] }; the flat
+// tools/capabilities/array fallbacks are kept for older runtimes.
+export function toolMapFromCapabilities(res) {
+  const entries = Array.isArray(res?.packages)
+    ? res.packages.flatMap(p => (Array.isArray(p?.tools) ? p.tools : []).map(t => ({ packageId: p.packageId, ...t })))
+    : res?.tools || res?.capabilities || (Array.isArray(res) ? res : [])
   const map = {}
   for (const t of entries) {
     if (!t) continue
@@ -58,7 +66,7 @@ export async function discoverTools() {
     }
     if (key) map[key] = name
   }
-  state.tools = map
+  return map
 }
 
 // Every result is normalized to { ok, value, error } (§7.2).
