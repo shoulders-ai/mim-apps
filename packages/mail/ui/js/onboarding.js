@@ -137,7 +137,7 @@ function pasteStepHtml() {
       <span>Waiting for Google… (<span class="mono" id="obCountdown">${mm}:${ss}</span>)</span>
       <button type="button" class="btn-quiet" data-action="ob-cancel" title="Stop waiting">Cancel</button>
     </div>
-    ${ob.consentUrl ? `<div class="ob-quiet">Browser didn't open? <button type="button" class="btn-quiet" data-action="ob-copy-link" title="Copy the consent URL">Copy link</button></div>` : ''}`
+    ${ob.consentUrl ? `<div class="ob-quiet">Browser didn't open? <a href="${escapeHtml(ob.consentUrl)}" target="_blank" rel="noreferrer">Open link</a> · <button type="button" class="btn-quiet" data-action="ob-copy-link" title="Copy the consent URL">Copy link</button></div>` : ''}`
   } else {
     connect = `<button type="button" class="btn-primary" data-action="ob-connect" id="obConnect"
       ${v?.state === 'valid' && !ob.connecting ? '' : 'disabled'} title="Store the client and open Google consent">
@@ -215,8 +215,11 @@ async function startConnect() {
   ob.waiting = true
   ob.consentUrl = r.value.consentUrl
   ob.deadline = Date.now() + 120000
-  const opened = window.open(ob.consentUrl, '_blank')
-  if (!opened) showToast('Browser didn’t open — use Copy link')
+  // Electron denies the popup and opens the URL in the system browser via
+  // shell.openExternal, so window.open returns null even on success — the
+  // return value must not be treated as failure. The waiting card carries an
+  // Open link + Copy link fallback for the cases where nothing opened.
+  window.open(ob.consentUrl, '_blank')
   render()
 
   countdownTimer = setInterval(() => {

@@ -3,23 +3,37 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createOAuth } from './oauth.mjs'
 import { fakeSecrets, fakeFetch } from './testUtils.mjs'
 import { createHash } from 'node:crypto'
+import { createServer as httpCreateServer } from 'node:http'
 
-// Minimal fake http server for testing
+// Minimal fake http server for testing. Mimics node:http timing: the socket
+// binds asynchronously, so the listen callback fires on a later microtask and
+// address() is null until then. (A synchronous fake here is exactly what
+// masked the live "Cannot read properties of null (reading 'port')" crash.)
 function fakeCreateServer(requestHandler) {
   let _handler = requestHandler
   let _port = 0
   let _listening = false
   let _closed = false
+  const _listeners = new Map()
 
   const server = {
     listen(port, host, cb) {
-      _port = port === 0 ? 12345 + Math.floor(Math.random() * 10000) : port
-      _listening = true
-      if (typeof host === 'function') host()
-      else if (typeof cb === 'function') cb()
+      queueMicrotask(() => {
+        if (_closed) return
+        _port = port === 0 ? 12345 + Math.floor(Math.random() * 10000) : port
+        _listening = true
+        if (typeof host === 'function') host()
+        else if (typeof cb === 'function') cb()
+      })
+    },
+    once(event, fn) {
+      _listeners.set(event, fn)
+    },
+    removeListener(event, fn) {
+      if (_listeners.get(event) === fn) _listeners.delete(event)
     },
     address() {
-      return { port: _port, address: '127.0.0.1' }
+      return _listening ? { port: _port, address: '127.0.0.1' } : null
     },
     close(cb) {
       _closed = true
@@ -71,46 +85,46 @@ describe('createOAuth', () => {
   })
 
   describe('client validation', () => {
-    it('rejects web client JSON with a specific error', () => {
+    it('rejects web client JSON with a specific error', async () => {
       secrets.set('google_oauth_client', JSON.stringify({ web: { client_id: 'x' } }))
       const oauth = createOAuth({ secrets, fetch: fakeFetch([]), createServer: fakeCreateServer })
 
-      expect(() => oauth.startFlow()).toThrow('Web OAuth client not supported')
-      expect(() => oauth.startFlow()).toThrow('Desktop app')
+      await expect(oauth.startFlow()).rejects.toThrow('Web OAuth client not supported')
+      await expect(oauth.startFlow()).rejects.toThrow('Desktop app')
     })
 
-    it('rejects missing client JSON', () => {
+    it('rejects missing client JSON', async () => {
       secrets.delete('google_oauth_client')
       const oauth = createOAuth({ secrets, fetch: fakeFetch([]), createServer: fakeCreateServer })
 
-      expect(() => oauth.startFlow()).toThrow('No OAuth client configured')
+      await expect(oauth.startFlow()).rejects.toThrow('No OAuth client configured')
     })
 
-    it('rejects JSON without installed key', () => {
+    it('rejects JSON without installed key', async () => {
       secrets.set('google_oauth_client', JSON.stringify({ other: {} }))
       const oauth = createOAuth({ secrets, fetch: fakeFetch([]), createServer: fakeCreateServer })
 
-      expect(() => oauth.startFlow()).toThrow('expected an "installed" key')
+      await expect(oauth.startFlow()).rejects.toThrow('expected an "installed" key')
     })
 
-    it('accepts installed client JSON (string)', () => {
+    it('accepts installed client JSON (string)', async () => {
       const oauth = createOAuth({ secrets, fetch: fakeFetch([]), createServer: fakeCreateServer })
-      const { consentUrl } = oauth.startFlow()
+      const { consentUrl } = await oauth.startFlow()
       expect(consentUrl).toContain('client_id=test-client-id')
     })
 
-    it('accepts installed client JSON (object)', () => {
+    it('accepts installed client JSON (object)', async () => {
       secrets.set('google_oauth_client', INSTALLED_CLIENT) // stored as object
       const oauth = createOAuth({ secrets, fetch: fakeFetch([]), createServer: fakeCreateServer })
-      const { consentUrl } = oauth.startFlow()
+      const { consentUrl } = await oauth.startFlow()
       expect(consentUrl).toContain('client_id=test-client-id')
     })
   })
 
   describe('startFlow', () => {
-    it('returns a consent URL with PKCE S256 parameters', () => {
+    it('returns a consent URL with PKCE S256 parameters', async () => {
       const oauth = createOAuth({ secrets, fetch: fakeFetch([]), createServer: fakeCreateServer })
-      const { consentUrl } = oauth.startFlow()
+      const { consentUrl } = await oauth.startFlow()
 
       const url = new URL(consentUrl)
       expect(url.searchParams.get('response_type')).toBe('code')
@@ -122,19 +136,19 @@ describe('createOAuth', () => {
       expect(url.searchParams.get('client_id')).toBe('test-client-id')
     })
 
-    it('uses 127.0.0.1 loopback redirect', () => {
+    it('uses 127.0.0.1 loopback redirect', async () => {
       const oauth = createOAuth({ secrets, fetch: fakeFetch([]), createServer: fakeCreateServer })
-      const { consentUrl } = oauth.startFlow()
+      const { consentUrl } = await oauth.startFlow()
 
       const url = new URL(consentUrl)
       expect(url.searchParams.get('redirect_uri')).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/)
     })
 
-    it('prevents concurrent flows (single pending)', () => {
+    it('prevents concurrent flows (single pending)', async () => {
       const oauth = createOAuth({ secrets, fetch: fakeFetch([]), createServer: fakeCreateServer })
-      oauth.startFlow()
+      await oauth.startFlow()
 
-      expect(() => oauth.startFlow()).toThrow('already in progress')
+      await expect(oauth.startFlow()).rejects.toThrow('already in progress')
     })
 
     it('allows a new flow after the previous one completes', async () => {
@@ -153,7 +167,7 @@ describe('createOAuth', () => {
         },
       })
 
-      const { consentUrl, waitForToken } = oauth.startFlow()
+      const { consentUrl, waitForToken } = await oauth.startFlow()
       const state = new URL(consentUrl).searchParams.get('state')
 
       // Simulate callback
@@ -161,7 +175,7 @@ describe('createOAuth', () => {
       await waitForToken()
 
       // Should be able to start a new flow now
-      const { consentUrl: url2 } = oauth.startFlow()
+      const { consentUrl: url2 } = await oauth.startFlow()
       expect(url2).toContain('client_id=test-client-id')
     })
 
@@ -181,7 +195,7 @@ describe('createOAuth', () => {
         },
       })
 
-      const { consentUrl, waitForToken } = oauth.startFlow()
+      const { consentUrl, waitForToken } = await oauth.startFlow()
       const state = new URL(consentUrl).searchParams.get('state')
 
       capturedServer._simulateRequest(`/?code=test-code&state=${state}`)
@@ -208,7 +222,7 @@ describe('createOAuth', () => {
         },
       })
 
-      const { consentUrl, waitForToken } = oauth.startFlow()
+      const { consentUrl, waitForToken } = await oauth.startFlow()
       const state = new URL(consentUrl).searchParams.get('state')
 
       capturedServer._simulateRequest(`/?code=test-code&state=${state}`)
@@ -219,20 +233,35 @@ describe('createOAuth', () => {
       expect(stored.refresh_token).toBe('new-refresh-token')
     })
 
-    it('rejects on state mismatch', async () => {
+    it('responds 400 on state mismatch and keeps the flow pending', async () => {
+      const fetch = fakeFetch([{
+        method: 'POST',
+        pattern: 'oauth2.googleapis.com/token',
+        handler: () => ({ status: 200, body: tokenResponse }),
+      }])
+      let capturedServer
       const oauth = createOAuth({
         secrets,
-        fetch: fakeFetch([]),
-        createServer: fakeCreateServer,
+        fetch,
+        createServer(handler) {
+          capturedServer = fakeCreateServer(handler)
+          return capturedServer
+        },
       })
 
-      const { consentUrl, waitForToken } = oauth.startFlow()
+      const { consentUrl, waitForToken } = await oauth.startFlow()
+      const state = new URL(consentUrl).searchParams.get('state')
 
-      // Use wrong state — request handler responds 400, does NOT resolve/reject the promise
-      // The flow stays pending. But let's verify the response
-      // Actually per the implementation, state mismatch just sends 400 to the browser
-      // but doesn't reject the promise — the user can try again or it times out.
-      // So we just check that the server returns 400.
+      // Wrong state (e.g. a stray request hitting the port): 400 to the
+      // browser, server stays open, promise stays pending.
+      const res = capturedServer._simulateRequest('/?code=x&state=wrong')
+      expect(res._status).toBe(400)
+      expect(capturedServer._closed).toBe(false)
+
+      // The real callback still completes the same flow afterwards.
+      capturedServer._simulateRequest(`/?code=test-code&state=${state}`)
+      const bundle = await waitForToken()
+      expect(bundle.access_token).toBe('new-access-token')
     })
 
     it('rejects on OAuth error response', async () => {
@@ -246,7 +275,7 @@ describe('createOAuth', () => {
         },
       })
 
-      const { consentUrl, waitForToken } = oauth.startFlow()
+      const { consentUrl, waitForToken } = await oauth.startFlow()
 
       capturedServer._simulateRequest('/?error=access_denied')
 
@@ -272,7 +301,7 @@ describe('createOAuth', () => {
         },
       })
 
-      const { consentUrl, waitForToken } = oauth.startFlow()
+      const { consentUrl, waitForToken } = await oauth.startFlow()
       const state = new URL(consentUrl).searchParams.get('state')
 
       capturedServer._simulateRequest(`/?code=bad-code&state=${state}`)
@@ -300,7 +329,7 @@ describe('createOAuth', () => {
         },
       })
 
-      const { consentUrl, waitForToken } = oauth.startFlow()
+      const { consentUrl, waitForToken } = await oauth.startFlow()
       const state = new URL(consentUrl).searchParams.get('state')
       const challenge = new URL(consentUrl).searchParams.get('code_challenge')
 
@@ -315,6 +344,63 @@ describe('createOAuth', () => {
       const verifier = params.get('code_verifier')
       const expectedChallenge = createHash('sha256').update(verifier).digest('base64url')
       expect(expectedChallenge).toBe(challenge)
+    })
+  })
+
+  // End-to-end over a REAL node:http loopback server — the production
+  // createServer path, with only Google itself faked. This is the test tier
+  // the sync fake cannot provide: real async bind, real port assignment,
+  // a real browser-shaped HTTP request into the callback handler.
+  describe('end to end with node:http', () => {
+    it('completes callback → exchange → persist and closes the listener', async () => {
+      const fetch = fakeFetch([{
+        method: 'POST',
+        pattern: 'oauth2.googleapis.com/token',
+        handler: () => ({ status: 200, body: tokenResponse }),
+      }])
+      const oauth = createOAuth({ secrets, fetch, createServer: httpCreateServer })
+
+      const { consentUrl, waitForToken } = await oauth.startFlow()
+      const url = new URL(consentUrl)
+      const redirect = new URL(url.searchParams.get('redirect_uri'))
+      expect(redirect.hostname).toBe('127.0.0.1')
+      expect(Number(redirect.port)).toBeGreaterThan(0)
+
+      const state = url.searchParams.get('state')
+      const browserHit = await globalThis.fetch(`http://127.0.0.1:${redirect.port}/?code=real-code&state=${state}`)
+      expect(browserHit.status).toBe(200)
+      expect(await browserHit.text()).toContain('Authorization successful')
+
+      const bundle = await waitForToken()
+      expect(bundle.access_token).toBe('new-access-token')
+      expect(JSON.parse(secrets.get('google_oauth_tokens')).refresh_token).toBe('new-refresh-token')
+
+      // The flow cleaned up: the port no longer accepts connections and a
+      // new flow can start.
+      await expect(
+        globalThis.fetch(`http://127.0.0.1:${redirect.port}/`, { signal: AbortSignal.timeout(2000) }),
+      ).rejects.toThrow()
+      const second = await oauth.startFlow()
+      expect(second.consentUrl).toContain('client_id=test-client-id')
+      // Deny the second flow so its listener and timeout are torn down.
+      // Attach the rejection handler BEFORE the denial arrives — the promise
+      // rejects while the fetch is in flight.
+      const secondRedirect = new URL(new URL(second.consentUrl).searchParams.get('redirect_uri'))
+      const secondRejected = expect(second.waitForToken()).rejects.toThrow('access_denied')
+      await globalThis.fetch(`http://127.0.0.1:${secondRedirect.port}/?error=access_denied`)
+      await secondRejected
+    })
+
+    it('rejects the flow when the user denies consent', async () => {
+      const oauth = createOAuth({ secrets, fetch: fakeFetch([]), createServer: httpCreateServer })
+
+      const { consentUrl, waitForToken } = await oauth.startFlow()
+      const redirect = new URL(new URL(consentUrl).searchParams.get('redirect_uri'))
+
+      const rejected = expect(waitForToken()).rejects.toThrow('OAuth error: access_denied')
+      const browserHit = await globalThis.fetch(`http://127.0.0.1:${redirect.port}/?error=access_denied`)
+      expect(browserHit.status).toBe(200)
+      await rejected
     })
   })
 

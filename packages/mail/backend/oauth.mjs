@@ -52,9 +52,9 @@ export function createOAuth({ secrets, fetch: fetchFn = globalThis.fetch, create
 
   /**
    * Start the OAuth consent flow.
-   * @returns {{ consentUrl: string, waitForToken: () => Promise<object> }}
+   * @returns {Promise<{ consentUrl: string, waitForToken: () => Promise<object> }>}
    */
-  function startFlow() {
+  async function startFlow() {
     if (_pendingFlow) {
       throw new Error('An OAuth flow is already in progress')
     }
@@ -71,6 +71,7 @@ export function createOAuth({ secrets, fetch: fetchFn = globalThis.fetch, create
 
     // We'll set up the server and build the consent URL
     const serverModule = createServer || _defaultCreateServer()
+    let port = 0
 
     const server = serverModule((req, res) => {
       try {
@@ -103,7 +104,7 @@ export function createOAuth({ secrets, fetch: fetchFn = globalThis.fetch, create
         res.end('<html><body>Authorization successful! You can close this tab.</body></html>')
 
         // Exchange code for tokens
-        _exchangeCode(code, client, verifier, server.address().port)
+        _exchangeCode(code, client, verifier, port)
           .then(tokenBundle => {
             _cleanup()
             resolveToken(tokenBundle)
@@ -120,9 +121,37 @@ export function createOAuth({ secrets, fetch: fetchFn = globalThis.fetch, create
       }
     })
 
-    // Listen on random port, 127.0.0.1 only
-    server.listen(0, '127.0.0.1')
-    const port = server.address().port
+    let timeout = null
+
+    function _cleanup() {
+      _pendingFlow = null
+      if (timeout) clearTimeout(timeout)
+      try { server.close() } catch {}
+    }
+
+    // Claim the pending slot before any await so a concurrent startFlow
+    // throws rather than opening a second listener.
+    _pendingFlow = { server, get timeout() { return timeout }, cleanup: _cleanup }
+
+    // Listen on a random port, 127.0.0.1 only. node:http binds
+    // asynchronously — address() is null until the 'listening' event, so the
+    // port MUST be read in the listen callback (reading it synchronously was
+    // a live crash: "Cannot read properties of null (reading 'port')").
+    try {
+      await new Promise((resolve, reject) => {
+        const onError = (err) => reject(err)
+        if (typeof server.once === 'function') server.once('error', onError)
+        server.listen(0, '127.0.0.1', () => {
+          if (typeof server.removeListener === 'function') server.removeListener('error', onError)
+          resolve()
+        })
+      })
+      port = server.address()?.port
+      if (!port) throw new Error('Loopback listener reported no port')
+    } catch (err) {
+      _cleanup()
+      throw err
+    }
 
     // Build consent URL
     const params = new URLSearchParams({
@@ -139,18 +168,10 @@ export function createOAuth({ secrets, fetch: fetchFn = globalThis.fetch, create
     const consentUrl = `${AUTH_URL}?${params.toString()}`
 
     // Self-terminating timeout
-    const timeout = setTimeout(() => {
+    timeout = setTimeout(() => {
       _cleanup()
       rejectToken(new Error('OAuth flow timed out after 120 seconds'))
     }, FLOW_TIMEOUT_MS)
-
-    function _cleanup() {
-      _pendingFlow = null
-      clearTimeout(timeout)
-      try { server.close() } catch {}
-    }
-
-    _pendingFlow = { server, timeout, cleanup: _cleanup }
 
     return {
       consentUrl,

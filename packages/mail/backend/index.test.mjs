@@ -277,18 +277,26 @@ function connectedSecrets() {
   })
 }
 
-// Minimal fake loopback server (oauth.test.mjs pattern).
+// Minimal fake loopback server (oauth.test.mjs pattern): binds
+// asynchronously and address() is null until listening, like node:http.
 function fakeCreateServerFactory(capture) {
   return (handler) => {
     let port = 0
+    let listening = false
     const server = {
       listen(p, host, cb) {
-        port = p === 0 ? 20000 + Math.floor(Math.random() * 10000) : p
-        if (typeof host === 'function') host()
-        else if (typeof cb === 'function') cb()
+        queueMicrotask(() => {
+          port = p === 0 ? 20000 + Math.floor(Math.random() * 10000) : p
+          listening = true
+          if (typeof host === 'function') host()
+          else if (typeof cb === 'function') cb()
+        })
       },
-      address: () => ({ port, address: '127.0.0.1' }),
+      once() {},
+      removeListener() {},
+      address: () => (listening ? { port, address: '127.0.0.1' } : null),
       close(cb) {
+        listening = false
         if (typeof cb === 'function') cb()
       },
       _simulateRequest(url, method = 'GET') {

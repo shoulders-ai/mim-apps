@@ -821,7 +821,7 @@ export const tools = {
       const { oauth, secrets } = await oauthFor(ctx)
       let flow
       try {
-        flow = oauth.startFlow()
+        flow = await oauth.startFlow()
       } catch (err) {
         return { error: err.message }
       }
