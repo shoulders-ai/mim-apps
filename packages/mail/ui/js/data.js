@@ -6,7 +6,7 @@
 // (tests import view modules that import this file).
 
 import { state, render, showToast } from './state.js'
-import { debounce } from './utils.js'
+import { debounce, cleanSnippet } from './utils.js'
 import { normHunkChanges } from './hunks.js'
 
 let _runtime = null
@@ -123,7 +123,7 @@ function normThreadRow(raw) {
     id: raw.id,
     gmailId: raw.gmail_id ?? raw.gmailId ?? '',
     subject: raw.subject ?? '',
-    snippet: raw.snippet ?? '',
+    snippet: cleanSnippet(raw.snippet ?? ''),
     fromName: raw.from_name ?? from?.name ?? (typeof raw.from === 'string' ? raw.from : '') ?? '',
     fromEmail: raw.from_email ?? from?.email ?? '',
     to: parseAddressList(raw.to_json ?? raw.to ?? []),
@@ -142,7 +142,7 @@ function normDraftRow(raw) {
     threadId: raw.thread_id ?? null,
     to: parseAddressList(raw.to_json ?? raw.to ?? []),
     subject: raw.subject ?? '',
-    snippet: raw.snippet ?? String(raw.body ?? '').split('\n')[0] ?? '',
+    snippet: cleanSnippet(raw.snippet ?? String(raw.body ?? '').split('\n')[0] ?? ''),
     state: raw.state ?? 'composing',
     updatedAt: raw.updated_at ? new Date(raw.updated_at).getTime() : Number(raw.updatedAt) || 0,
     kind: 'draft',
@@ -159,7 +159,7 @@ function normMessage(raw) {
     to: parseAddressList(raw.to_json ?? raw.to ?? []),
     cc: parseAddressList(raw.cc_json ?? raw.cc ?? []),
     subject: raw.subject ?? '',
-    snippet: raw.snippet ?? '',
+    snippet: cleanSnippet(raw.snippet ?? ''),
     body: raw.body_text ?? raw.body ?? '',
     date: Number(raw.internal_date ?? raw.date ?? 0) || 0,
     unread: !!raw.is_unread,
@@ -296,6 +296,10 @@ export async function loadMore() {
 
 export async function loadThread(threadId, { keepExpanded = false } = {}) {
   const r = await call('ui_thread', { thread_id: threadId })
+  // Race guard: during rapid j/k navigation (or a keepExpanded refetch) a
+  // slow older response can land after the user moved on — it must never
+  // clobber the thread now on screen.
+  if (state.route.threadId !== threadId) return r
   if (!r.ok) {
     state.thread.error = r.error
     return r
@@ -317,8 +321,26 @@ export async function loadThread(threadId, { keepExpanded = false } = {}) {
 
 // ── Navigation ──
 
-function markThreadRead(threadId) {
-  markRead(threadId)
+// Deferred read-marking: the row flips read optimistically on open, but the
+// server call fires only after the thread has been open ~800ms. Selection
+// pass-over during held-down j/k must not mark threads read on the server;
+// opening and dwelling still does.
+const MARK_READ_DWELL_MS = 800
+let markReadTimer = null
+
+function cancelPendingMarkRead() {
+  if (markReadTimer) clearTimeout(markReadTimer)
+  markReadTimer = null
+}
+
+function scheduleMarkRead(threadId) {
+  cancelPendingMarkRead()
+  markReadTimer = setTimeout(() => {
+    markReadTimer = null
+    if (state.route.view === 'thread' && state.route.threadId === threadId) {
+      markRead(threadId) // optimistic, fire & reconcile silently
+    }
+  }, MARK_READ_DWELL_MS)
 }
 
 export async function openThread(threadId, { markRead = true } = {}) {
@@ -328,12 +350,13 @@ export async function openThread(threadId, { markRead = true } = {}) {
     state.studio.open = false
     state.studio.draft = null
   }
+  cancelPendingMarkRead()
   state.route = { view: 'thread', threadId, draftId: null }
   state.inbox.selectedId = threadId
   const row = state.inbox.threads.find(t => t.id === threadId)
   if (row && row.unread && markRead) {
     row.unread = false
-    markThreadRead(threadId) // optimistic, fire & reconcile silently
+    scheduleMarkRead(threadId)
   }
   state.thread = { thread: row || null, messages: [], drafts: [], expanded: new Set(), unquoted: new Set(), error: '' }
   render()
@@ -344,17 +367,20 @@ export async function openThread(threadId, { markRead = true } = {}) {
 }
 
 export function backToList() {
+  cancelPendingMarkRead()
   state.route = { view: 'inbox', threadId: null, draftId: null }
   render()
 }
 
 export function openVoices() {
+  cancelPendingMarkRead()
   state.route = { view: 'voices', threadId: null, draftId: null }
   render()
   loadVoices().then(render)
 }
 
 export function openInbox() {
+  cancelPendingMarkRead()
   state.route = { view: 'inbox', threadId: null, draftId: null }
   render()
 }
@@ -388,7 +414,7 @@ export async function createDraft(fields = {}) {
 // before any body-reading tool call.
 let editInFlight = null
 
-async function sendDraftEdit() {
+async function sendDraftEdit({ retriedAfterConflict = false } = {}) {
   const s = state.studio
   if (!s.draft) return
   const payload = {
@@ -406,8 +432,34 @@ async function sendDraftEdit() {
     }
     const v = r.value || {}
     if (v.conflict) {
-      await loadDraft(s.draft.id)
-      showToast('Draft changed elsewhere — reloaded')
+      // Conflicts never discard prose. Two conflicts in a row: stop — the
+      // buffer already holds the user's text; never reload over it, never
+      // loop. s.dirty stays set so a later keystroke retries naturally.
+      if (retriedAfterConflict) {
+        s.dirty = true
+        s.opError = 'Draft is changing too fast — your text is preserved locally'
+        render()
+        return
+      }
+      // Capture the local body, reload to learn the new head revision, then
+      // put the user's words back and ledger them as a human_edit on top of
+      // the new head. The user's prose always wins.
+      const localBody = s.body
+      const reload = await loadDraft(s.draft.id)
+      if (!reload.ok) {
+        s.dirty = true
+        s.opError = reload.error
+        render()
+        return
+      }
+      showToast('Draft changed elsewhere — kept your text')
+      if (localBody !== s.body) {
+        s.body = localBody
+        s.dirty = true
+        render()
+        await sendDraftEdit({ retriedAfterConflict: true })
+        return
+      }
       render()
       return
     }

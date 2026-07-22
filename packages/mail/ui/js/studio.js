@@ -21,6 +21,33 @@ let confirmOpenedAt = 0
 let confirmFocused = false
 let noteTimer = null
 let commentValue = ''
+let sendGuardTimer = null
+
+// ── Send-gate helpers (pure, tested in studio.confirm.test.mjs) ──
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+// Every address across To/Cc/Bcc, bucketed by whether it can actually
+// receive mail. The confirm card, footer, and primaryAction all gate on
+// this — the send gate must be beyond reproach.
+export function validRecipients(draft) {
+  const valid = []
+  const invalid = []
+  for (const field of ['to', 'cc', 'bcc']) {
+    for (const addr of draft?.[field] ?? []) {
+      if (EMAIL_RE.test(addr.email)) valid.push(addr)
+      else invalid.push(addr)
+    }
+  }
+  return { valid, invalid }
+}
+
+// ⌘⏎ landing inside the anti-double-fire window defers the send by the
+// remaining guard time instead of dropping the press. 0 once past it.
+export function sendGuardDelay(elapsedMs, guardMs = 250) {
+  const remaining = guardMs - elapsedMs
+  return remaining > 0 ? remaining : 0
+}
 
 // ── Open paths ──
 
@@ -118,9 +145,14 @@ function resetStudioState() {
   s.opError = ''
   s.generating = false
   s.history = { selectedId: null, body: null, loading: false }
+  s.discardArmed = false
   commentValue = ''
   confirmFocused = false
   lastConfirmKey = ''
+  if (sendGuardTimer) {
+    clearTimeout(sendGuardTimer)
+    sendGuardTimer = null
+  }
 }
 
 export function closeStudio() {
@@ -254,7 +286,7 @@ export function update() {
 // ── Meta line (§3.4.3) ──
 
 function chipHtml(field, addr, idx) {
-  const invalid = !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr.email)
+  const invalid = !EMAIL_RE.test(addr.email)
   return `<button type="button" class="chip${invalid ? ' invalid' : ''}" data-action="chip-edit"
     data-field="${field}" data-idx="${idx}" title="Edit ${escapeAttr(addr.email || addr.name)}">
     ${escapeHtml(data.addrFull(addr))}<span class="chip-x" aria-hidden="true">×</span></button>`
@@ -292,6 +324,10 @@ function updateMeta(force = false) {
     </div>`
   el.innerHTML = `<div class="st-meta expanded">
     <div class="st-meta-fields">
+      <div class="meta-row">
+        <span class="meta-label">From</span>
+        <span class="meta-from">${escapeHtml(state.conn.email || '—')}</span>
+      </div>
       ${row('to', 'To', d.to, 'metaTo')}
       ${row('cc', 'Cc', d.cc, 'metaCc')}
       ${row('bcc', 'Bcc', d.bcc, 'metaBcc')}
@@ -413,11 +449,11 @@ function updateHead() {
 export function dismissAllMenuHtml() {
   return `<div class="menu" role="menu" aria-label="Dismiss all" data-menu="dismissAll">
     <button type="button" class="menu-item" role="menuitem" data-action="dismiss-plain"
-      title="Dismiss these suggestions">Not this time</button>
+      title="Dismiss these suggestions">
+      <span class="menu-2line"><span>Dismiss</span>
+      <span class="menu-sub">The AI may suggest again</span></span></button>
     <button type="button" class="menu-item" role="menuitem" data-action="dismiss-takeover"
-      title="Tells the AI to stop suggesting on this draft">
-      <span class="menu-2line"><span>I’ll take it from here</span>
-      <span class="menu-sub">tells the AI to stop suggesting on this draft</span></span></button>
+      title="Stops AI suggestions on this draft">Dismiss and stop suggesting on this draft</button>
   </div>`
 }
 
@@ -508,6 +544,8 @@ function updateFooter() {
   const empty = s.body.trim() === ''
   const placeholder = empty ? '✦ Tell the AI what this email should say…' : '✦ Ask AI to change something…'
   const primaryLabel = s.draft.state === 'approved' ? 'Send…' : s.draft.state === 'send_failed' ? 'Send…' : 'Approve'
+  // Hard send gate: no valid To address → nothing to approve or send.
+  const hasValidTo = (s.draft.to ?? []).some(a => EMAIL_RE.test(a.email))
   el.innerHTML = `
     <div class="askai${s.askAi.pending ? ' pending' : ''}">
       ${s.askAi.scope ? `<button type="button" class="scope-chip" data-action="clear-scope" title="Remove paragraph scope">¶${s.askAi.scope} ×</button>` : ''}
@@ -516,7 +554,8 @@ function updateFooter() {
       ${s.askAi.pending ? '<span class="askai-progress"><span class="spinner" aria-hidden="true"></span>Proposing…</span>' : ''}
     </div>
     <button type="button" class="icon-btn" id="btnOverflow" data-action="open-overflow" title="More" aria-haspopup="menu">${icon('dots')}</button>
-    <button type="button" class="btn-primary" id="stPrimary" data-action="primary" title="${primaryLabel === 'Approve' ? 'Approve (⌘⏎)' : 'Send (⌘⏎)'}">${primaryLabel} ⌘⏎</button>`
+    <button type="button" class="btn-primary" id="stPrimary" data-action="primary" ${hasValidTo ? '' : 'disabled'}
+      title="${hasValidTo ? (primaryLabel === 'Approve' ? 'Approve (⌘⏎)' : 'Send (⌘⏎)') : 'Add a valid To recipient first'}">${primaryLabel} ⌘⏎</button>`
   const input = qs('#askAiInput', rootEl)
   if (input) {
     input.addEventListener('input', () => { s.askAi.text = input.value })
@@ -541,7 +580,7 @@ export function overflowMenuHtml() {
       title="Draft revisions">History…</button>
     <div class="menu-sep"></div>
     <button type="button" class="menu-item danger" role="menuitem" data-action="discard-draft"
-      title="Discard this draft">Discard draft</button>
+      title="Discard this draft">${state.studio.discardArmed ? 'Discard — sure?' : 'Discard draft'}</button>
   </div>`
 }
 
@@ -577,7 +616,12 @@ function updateConfirm() {
   const el = qs('#stConfirm', rootEl)
   if (!el) return
   const s = state.studio
-  const key = !s.confirm ? '' : typeof s.confirm === 'object' ? `error:${s.confirm.error}` : s.confirm
+  // Recipients are part of the key: if they change under an open card the
+  // gate re-renders rather than showing (and sending to) a stale list.
+  const recipKey = s.draft
+    ? ['to', 'cc', 'bcc'].map(f => (s.draft[f] ?? []).map(a => a.email).join(',')).join(';')
+    : ''
+  const key = !s.confirm ? '' : typeof s.confirm === 'object' ? `error:${s.confirm.error}` : `${s.confirm}|${recipKey}`
   if (key === lastConfirmKey && el.firstElementChild) return // no focus churn on background renders
   lastConfirmKey = key
   if (!s.confirm) {
@@ -605,31 +649,55 @@ function updateConfirm() {
   const line = (label, value) => value
     ? `<div class="confirm-row"><span class="confirm-label">${label}</span><span class="confirm-val">${escapeHtml(value)}</span></div>`
     : ''
+  const lineHtml = (label, html) => html
+    ? `<div class="confirm-row"><span class="confirm-label">${label}</span><span class="confirm-val">${html}</span></div>`
+    : ''
+  // Invalid addresses get the same tint-rem treatment as invalid chips.
+  const recipsHtml = (list) => list.map(a => {
+    const full = escapeHtml(data.addrFull(a))
+    return EMAIL_RE.test(a.email) ? full
+      : `<span class="confirm-invalid-addr">${full}</span>`
+  }).join(', ')
+  const { invalid } = validRecipients(d)
+  const blocked = invalid.length > 0
+  const invalidLine = blocked
+    ? `<div class="confirm-invalid">Fix invalid recipients before sending: ${escapeHtml(invalid.map(a => a.email || a.name).join(', '))}</div>`
+    : ''
   el.innerHTML = `<div class="confirm-card" role="alertdialog" aria-modal="true" aria-label="Send this email?" id="confirmCard">
     <div class="confirm-title">Send this email?</div>
-    ${line('To', d.to.map(data.addrFull).join(', ') || '—')}
-    ${line('Cc', d.cc.map(data.addrFull).join(', '))}
-    ${line('Bcc', d.bcc.map(data.addrFull).join(', '))}
+    ${line('From', state.conn.email)}
+    ${lineHtml('To', recipsHtml(d.to) || '—')}
+    ${lineHtml('Cc', recipsHtml(d.cc))}
+    ${lineHtml('Bcc', recipsHtml(d.bcc))}
     ${line('Subject', d.subject || '(no subject)')}
     ${line('Voice', voice ? voice.name : '')}
+    ${invalidLine}
     ${d.threadId ? `<label class="confirm-quote">
       <input type="checkbox" id="quoteToggle" ${s.includeQuote ? 'checked' : ''} ${sending ? 'disabled' : ''}>
       Include quoted thread below your reply</label>` : ''}
     <div class="confirm-actions">
       <button type="button" class="btn-quiet" data-action="confirm-cancel" title="Back to the draft (Esc)" ${sending ? 'disabled' : ''}>Cancel</button>
-      <button type="button" class="btn-primary" id="btnConfirmSend" data-action="confirm-send" title="Send (⌘⏎)" ${sending ? 'disabled' : ''}>
+      <button type="button" class="btn-primary" id="btnConfirmSend" data-action="confirm-send"
+        title="${blocked ? 'Fix invalid recipients first' : 'Send (⌘⏎)'}" ${sending || blocked ? 'disabled' : ''}>
         ${sending ? '<span class="spinner" aria-hidden="true"></span> Sending…' : 'Send ⌘⏎'}</button>
     </div>
   </div>`
   updateFooter()
   const quote = qs('#quoteToggle', rootEl)
-  if (quote) quote.addEventListener('change', () => { s.includeQuote = quote.checked })
+  if (quote) quote.addEventListener('change', () => {
+    s.includeQuote = quote.checked
+    // What was approved must be exactly what sends: flipping the quote
+    // changes the outgoing message, so approval resets and the card
+    // closes — re-approve from the footer to reopen it.
+    if (s.draft.state === 'approved') approvalReset()
+  })
   const card = qs('#confirmCard', rootEl)
   if (card) {
     card.addEventListener('keydown', trapConfirmTab)
     if (!confirmFocused && !sending) {
       confirmFocused = true
-      qs('#btnConfirmSend', rootEl)?.focus()
+      if (blocked) card.querySelector('[data-action="confirm-cancel"]')?.focus()
+      else qs('#btnConfirmSend', rootEl)?.focus()
     }
   }
 }
@@ -982,6 +1050,16 @@ function setScope(n) {
 export async function primaryAction() {
   const s = state.studio
   if (!s.open || !s.draft || s.confirm) return
+  // Belt and braces with the disabled footer button: never approve or
+  // open the send card without a deliverable To address.
+  if (!(s.draft.to ?? []).some(a => EMAIL_RE.test(a.email))) {
+    const bad = validRecipients(s.draft).invalid.map(a => a.email || a.name).filter(Boolean).join(', ')
+    s.opError = bad
+      ? `Can’t send — no valid recipient in To (invalid: ${bad})`
+      : 'Can’t send — no valid recipient in To'
+    updateErrors()
+    return
+  }
   if (s.draft.state === 'approved' || s.draft.state === 'send_failed') {
     openConfirm()
     return
@@ -1010,9 +1088,28 @@ function openConfirm() {
 export async function confirmSend() {
   const s = state.studio
   if (s.confirm !== 'card') return
-  if (performance.now() - confirmOpenedAt < 250) return // anti double-fire
+  // The card's Send button is disabled while any recipient is invalid;
+  // this guards the ⌘⏎ path that bypasses the button.
+  const { invalid } = validRecipients(s.draft)
+  if (invalid.length || !(s.draft.to ?? []).some(a => EMAIL_RE.test(a.email))) return
+  // Anti double-fire: a press inside the guard window is deferred by the
+  // remaining time, never dropped. The sending state renders immediately;
+  // it also makes re-entry a no-op (confirm !== 'card') while scheduled.
+  const delay = sendGuardDelay(performance.now() - confirmOpenedAt)
   s.confirm = 'sending'
   updateConfirm()
+  if (delay > 0) {
+    sendGuardTimer = setTimeout(() => {
+      sendGuardTimer = null
+      performSend()
+    }, delay)
+    return
+  }
+  await performSend()
+}
+
+async function performSend() {
+  const s = state.studio
   let r
   if (s.draft.state === 'send_failed') {
     // Failed sends drop out of `approved`; re-approve on the current
@@ -1173,8 +1270,17 @@ export const studioActions = {
     render()
   },
   'discard-draft': async () => {
-    closeMenus()
     const s = state.studio
+    // Two-step, mirroring the settings Disconnect pattern: first click
+    // arms ("Discard — sure?"), the second click discards. Any other
+    // studio action disarms (see the wrapper below studioActions).
+    if (!s.discardArmed) {
+      s.discardArmed = true
+      render()
+      return
+    }
+    s.discardArmed = false
+    closeMenus()
     const draftId = s.draft.id
     const threadId = state.route.threadId
     closeStudio()
@@ -1199,6 +1305,16 @@ export const studioActions = {
     updateConfirm()
     qs('#stPrimary', rootEl)?.focus()
   },
+}
+
+// Clicking anywhere else resets the armed discard: every studio action
+// except the discard confirm itself disarms before running.
+for (const [name, fn] of Object.entries(studioActions)) {
+  if (name === 'discard-draft') continue
+  studioActions[name] = (el) => {
+    state.studio.discardArmed = false
+    return fn(el)
+  }
 }
 
 export function voicePickerMenuHtml() {

@@ -1,13 +1,18 @@
 // Onboarding (UX-SPEC §3.1): guided BYO-OAuth-client setup with instant
-// client-JSON validation. validateClientJson is pure and node-tested.
+// client-JSON validation. Step 1 forks on account type (workspace |
+// personal) and tailors the consent-screen copy; the paste step is last.
+// validateClientJson and setupInstructionsText are pure and node-tested.
 
 import { state, render, showToast } from './state.js'
 import { escapeHtml, escapeAttr, qs } from './utils.js'
 import { icon } from './icons.js'
 import * as data from './data.js'
 
-// ── Pure validator (§3.1 step 5) ─────────────────────────────────────────
-// -> { state: 'empty'|'incomplete'|'error'|'valid', message?, projectId? }
+// state.js owns the store shape; the fork field is seeded here at runtime.
+state.onboarding.accountType ??= null
+
+// ── Pure validator (paste step) ──────────────────────────────────────────
+// Returns { state: 'empty'|'incomplete'|'error'|'valid', message?, projectId? }
 
 export function validateClientJson(text) {
   const raw = String(text ?? '').trim()
@@ -33,43 +38,114 @@ export function validateClientJson(text) {
   return { state: 'valid', projectId: inst.project_id || '' }
 }
 
-// ── View ─────────────────────────────────────────────────────────────────
+// ── Account-type fork copy ───────────────────────────────────────────────
+
+const ACCOUNT_LABELS = {
+  workspace: 'Work (Google Workspace)',
+  personal: 'Personal Gmail',
+}
+
+const CONSENT_COPY = {
+  workspace: { body: 'Choose Internal. Done.', warn: '' },
+  personal: {
+    body: 'Choose External, then add yourself as a test user.',
+    warn: 'Google disconnects personal accounts every 7 days — reconnecting takes about 20 seconds.',
+  },
+}
+
+// Unknown/unset falls back to the personal copy — the cautious branch.
+function consentCopy(accountType) {
+  return CONSENT_COPY[accountType] || CONSENT_COPY.personal
+}
+
+// ── Steps ────────────────────────────────────────────────────────────────
+// body/warning may be functions of accountType (resolved at render time).
+// `text` is the plain-text stand-in used only by setupInstructionsText.
 
 const STEPS = [
   {
     n: 1,
+    title: 'Which account?',
+    fork: true,
+  },
+  {
+    n: 2,
     title: 'Create a Google Cloud project',
     link: 'https://console.cloud.google.com/projectcreate',
     linkLabel: 'Open project creator',
     body: 'Any name works. Free, no billing needed.',
   },
   {
-    n: 2,
+    n: 3,
     title: 'Enable the Gmail API',
     link: 'https://console.cloud.google.com/apis/library/gmail.googleapis.com',
     linkLabel: 'Open Gmail API page',
     body: 'Pick your new project, press Enable.',
   },
   {
-    n: 3,
+    n: 4,
     title: 'Configure the consent screen',
     link: 'https://console.cloud.google.com/apis/credentials/consent',
     linkLabel: 'Open consent screen',
-    body: 'Workspace account → choose Internal.',
-    warning: true,
+    body: (accountType) => consentCopy(accountType).body,
+    warning: (accountType) => consentCopy(accountType).warn,
   },
   {
-    n: 4,
+    n: 5,
     title: 'Create a Desktop-app OAuth client',
     link: 'https://console.cloud.google.com/apis/credentials/oauthclient',
     linkLabel: 'Open client creator',
     body: 'Application type: Desktop app. Download the JSON.',
   },
   {
-    n: 5,
+    n: 6,
     title: 'Paste the client JSON',
+    text: 'Open Mail and paste the contents of the downloaded JSON file into the setup screen.',
   },
 ]
+
+const LAST_STEP = STEPS.length
+
+// ── Plain-text instructions for handing to IT ────────────────────────────
+// Pure. Inlines the chosen account-type branch; with no choice yet, both
+// branches appear, labeled.
+
+export function setupInstructionsText(accountType) {
+  const acct = ACCOUNT_LABELS[accountType] ? accountType : null
+  const branchLine = (type) => {
+    const c = consentCopy(type)
+    return [c.body, c.warn].filter(Boolean).join(' ')
+  }
+  const lines = ['Mail — Gmail setup (your own Google OAuth client, Desktop app)']
+  lines.push(acct
+    ? `Account type: ${ACCOUNT_LABELS[acct]}`
+    : 'Account type: not chosen yet — both options included below.')
+  STEPS.filter((s) => !s.fork).forEach((step, i) => {
+    lines.push('', `${i + 1}. ${step.title}`)
+    if (typeof step.body === 'function') {
+      if (acct) lines.push(`   ${branchLine(acct)}`)
+      else {
+        lines.push(`   ${ACCOUNT_LABELS.workspace}: ${branchLine('workspace')}`)
+        lines.push(`   ${ACCOUNT_LABELS.personal}: ${branchLine('personal')}`)
+      }
+    } else if (step.body || step.text) {
+      lines.push(`   ${step.body || step.text}`)
+    }
+    if (step.link) lines.push(`   ${step.link}`)
+  })
+  return lines.join('\n') + '\n'
+}
+
+// ── View ─────────────────────────────────────────────────────────────────
+
+function forkHtml() {
+  return `<div>
+    <button type="button" class="btn-quiet" data-action="ob-account" data-account="workspace"
+      id="obStepPrimary" title="Google Workspace account">${escapeHtml(ACCOUNT_LABELS.workspace)}</button>
+    <button type="button" class="btn-quiet" data-action="ob-account" data-account="personal"
+      title="Personal @gmail.com account">${escapeHtml(ACCOUNT_LABELS.personal)}</button>
+  </div>`
+}
 
 function stepHtml(step) {
   const ob = state.onboarding
@@ -90,19 +166,23 @@ function stepHtml(step) {
       <span class="ob-step-title">${escapeHtml(step.title)}</span>
     </div>`
   }
+  const body = typeof step.body === 'function' ? step.body(ob.accountType) : step.body
+  const warning = typeof step.warning === 'function' ? step.warning(ob.accountType) : ''
   let inner = ''
   if (step.link) {
     inner += `<a class="ob-link" href="${escapeAttr(step.link)}" target="_blank" rel="noreferrer"
       id="obStepPrimary">${escapeHtml(step.linkLabel)} ↗</a>`
   }
-  if (step.body) inner += `<div class="ob-body">${escapeHtml(step.body)}</div>`
-  if (step.warning) {
+  if (body) inner += `<div class="ob-body">${escapeHtml(body)}</div>`
+  if (warning) {
     inner += `<div class="ob-warn">
       <span class="ob-warn-icon">${icon('alert-triangle')}</span>
-      <span>Personal account → External + Testing: Google expires the connection every 7 days — you'll reconnect weekly. Add yourself as a test user.</span>
+      <span>${escapeHtml(warning)}</span>
     </div>`
   }
-  if (step.n < 5) {
+  if (step.fork) {
+    inner += forkHtml() // choosing advances — no generic Done button
+  } else if (step.n < LAST_STEP) {
     inner += `<button type="button" class="btn-quiet ob-next" data-action="ob-next" title="Mark done, continue">Done — next</button>`
   } else {
     inner += pasteStepHtml()
@@ -159,25 +239,32 @@ function pasteStepHtml() {
 }
 
 export function renderOnboarding() {
-  // Errors raised outside step 5 (e.g. runtime unavailable at boot) must
-  // still have a face — step 5's card only renders when it is current.
-  const globalError = state.onboarding.error && state.onboarding.step !== 5
+  // Errors raised outside the paste step (e.g. runtime unavailable at boot)
+  // must still have a face — the paste step's card only renders when it is
+  // current.
+  const globalError = state.onboarding.error && state.onboarding.step !== LAST_STEP
     ? `<div class="ob-error-card" role="alert"><div>${escapeHtml(state.onboarding.error)}</div></div>`
     : ''
   return `<div class="ob-wrap">
     <div class="ob" role="region" aria-label="Connect Gmail">
       <div class="ob-brand">Mail</div>
-      <div class="ob-sub">Your Gmail, drafted with you — stored in one local file. Nothing touches a third-party server. One-time setup, about 5 minutes.</div>
+      <div class="ob-sub">
+        <div>Your own Google OAuth client. About four minutes.</div>
+        <div>Mail mirrors to one local file. Drafting sends the open thread and your voice notes to the AI model you configure — nowhere else.</div>
+        <button type="button" class="btn-quiet" data-action="ob-copy-setup" title="Copy these steps as plain text, e.g. for IT">Copy setup instructions</button>
+      </div>
       ${globalError}
       <div class="ob-steps">${STEPS.map(stepHtml).join('')}</div>
     </div>
   </div>`
 }
 
-// Focus the advancing step's primary control (§5.2).
+// Focus the advancing step's primary control (§5.2): the fork step's first
+// option and link steps carry #obStepPrimary; the paste step focuses the
+// textarea.
 export function focusStep() {
   requestAnimationFrame(() => {
-    if (state.onboarding.step === 5) qs('#obJson')?.focus()
+    if (state.onboarding.step === LAST_STEP) qs('#obJson')?.focus()
     else qs('#obStepPrimary')?.focus()
   })
 }
@@ -239,7 +326,7 @@ async function startConnect() {
     if (state.conn.connected && state.conn.tokenOk) {
       stopConnectTimers()
       state.onboarding.waiting = false
-      // Route → Inbox immediately; the inbox streams in during backfill.
+      // Route to Inbox immediately; the inbox streams in during backfill.
       state.route = { view: 'inbox', threadId: null, draftId: null }
       render()
       data.getSettings()
@@ -252,8 +339,14 @@ async function startConnect() {
 }
 
 export const onboardingActions = {
+  'ob-account': (el) => {
+    state.onboarding.accountType = el.dataset.account === 'workspace' ? 'workspace' : 'personal'
+    state.onboarding.step = 2
+    render()
+    focusStep()
+  },
   'ob-next': () => {
-    state.onboarding.step = Math.min(5, state.onboarding.step + 1)
+    state.onboarding.step = Math.min(LAST_STEP, state.onboarding.step + 1)
     render()
     focusStep()
   },
@@ -277,6 +370,14 @@ export const onboardingActions = {
       showToast('Link copied')
     } catch {
       showToast('Copy failed — select the URL manually')
+    }
+  },
+  'ob-copy-setup': async () => {
+    try {
+      await navigator.clipboard.writeText(setupInstructionsText(state.onboarding.accountType))
+      showToast('Setup instructions copied')
+    } catch {
+      showToast('Copy failed')
     }
   },
 }
