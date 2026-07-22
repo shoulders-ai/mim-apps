@@ -184,6 +184,48 @@ describe('createStore', () => {
       expect(threads[0].last_message_at).toBe(1700000001000)
     })
 
+    it('searchThreads rows carry the latest sender without loading messages', () => {
+      store.upsertMessage('a1', {
+        gmail_id: 'gm1',
+        thread_gmail_id: 'gt1',
+        from_name: 'Alice',
+        from_email: 'alice@example.com',
+        to_json: '[]',
+        subject: 'Hello',
+        snippet: 'First',
+        body_text: 'First message',
+        internal_date: 1700000000000,
+        is_unread: 0,
+        is_from_me: 0,
+        label_ids_json: JSON.stringify(['INBOX']),
+      })
+      store.upsertMessage('a1', {
+        gmail_id: 'gm2',
+        thread_gmail_id: 'gt1',
+        from_name: 'Bob',
+        from_email: 'bob@example.com',
+        to_json: '[]',
+        subject: 'Re: Hello',
+        snippet: 'Second',
+        body_text: 'Second message',
+        internal_date: 1700000001000,
+        is_unread: 0,
+        is_from_me: 0,
+        label_ids_json: JSON.stringify(['INBOX']),
+      })
+
+      // All three query branches: plain, label-filtered, FTS.
+      const all = store.searchThreads({ accountId: 'a1', limit: 10 })
+      expect(all[0].last_from_name).toBe('Bob')
+      expect(all[0].last_from_email).toBe('bob@example.com')
+
+      const inbox = store.searchThreads({ accountId: 'a1', tab: 'inbox', limit: 10 })
+      expect(inbox[0].last_from_name).toBe('Bob')
+
+      const fts = store.searchThreads({ accountId: 'a1', query: 'hello', limit: 10 })
+      expect(fts[0].last_from_name).toBe('Bob')
+    })
+
     it('updating an existing message recalculates thread rollup', () => {
       store.upsertMessage('a1', {
         gmail_id: 'gm1',

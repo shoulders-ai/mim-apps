@@ -231,13 +231,22 @@ function addressEmails(jsonText) {
 }
 
 function threadRow(thread) {
-  const store = getStore()
-  const messages = store.getThreadMessages(thread.id)
-  const last = messages[messages.length - 1]
+  // searchThreads rows precompute the latest sender; rows from getThread
+  // (single-thread paths) fall back to one message lookup.
+  let fromName = thread.last_from_name
+  let fromEmail = thread.last_from_email
+  if (fromName === undefined && fromEmail === undefined) {
+    const messages = getStore().getThreadMessages(thread.id)
+    const last = messages[messages.length - 1]
+    fromName = last?.from_name
+    fromEmail = last?.from_email
+  }
   return {
     id: thread.id,
     subject: thread.subject,
-    from: last ? last.from_name || last.from_email || '' : '',
+    from: fromName || fromEmail || '',
+    from_name: fromName ?? '',
+    from_email: fromEmail ?? '',
     date: thread.last_message_at,
     snippet: thread.snippet,
     unread: thread.is_unread === 1,
@@ -1581,7 +1590,9 @@ const NAMED_TOOL_NAMES = [
 
 export const agents = {
   mail: {
-    name: 'Mail',
+    // "Mail Agent", not "Mail" — the app's own sidebar row already carries
+    // that label, and two identical labels are indistinguishable.
+    name: 'Mail Agent',
     tools: NAMED_TOOL_NAMES,
     // Instructions read ONLY the precomputed kv snapshot (3 s budget) — never
     // the live SQLite mirror.

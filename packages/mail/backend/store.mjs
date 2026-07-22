@@ -395,6 +395,14 @@ export function createStore({ dbPath }) {
 
   // --- Search ---
 
+  // List rows need the latest sender; correlated subqueries keep the listing
+  // a single statement instead of a per-row message load.
+  const LAST_SENDER_COLS = `
+    (SELECT m2.from_name FROM messages m2 WHERE m2.thread_id = t.id
+      ORDER BY m2.internal_date DESC LIMIT 1) AS last_from_name,
+    (SELECT m2.from_email FROM messages m2 WHERE m2.thread_id = t.id
+      ORDER BY m2.internal_date DESC LIMIT 1) AS last_from_email`
+
   function searchThreads({ accountId, tab, query, limit = 50, offset = 0 }) {
     const d = ensureOpen()
 
@@ -406,7 +414,7 @@ export function createStore({ dbPath }) {
 
       // FTS returns message_ids; join to threads
       let sql = `
-        SELECT DISTINCT t.*
+        SELECT DISTINCT t.*, ${LAST_SENDER_COLS}
         FROM messages_fts fts
         JOIN messages m ON m.id = fts.message_id
         JOIN threads t ON t.id = m.thread_id
@@ -430,7 +438,7 @@ export function createStore({ dbPath }) {
     if (tab === 'inbox' || tab === 'sent') {
       const labelFilter = tab === 'inbox' ? 'INBOX' : 'SENT'
       return d.prepare(`
-        SELECT DISTINCT t.*
+        SELECT DISTINCT t.*, ${LAST_SENDER_COLS}
         FROM threads t
         JOIN messages m ON m.thread_id = t.id
         WHERE t.account_id = ?
@@ -442,9 +450,10 @@ export function createStore({ dbPath }) {
 
     // Default: all threads for account
     return d.prepare(`
-      SELECT * FROM threads
-      WHERE account_id = ?
-      ORDER BY last_message_at DESC
+      SELECT t.*, ${LAST_SENDER_COLS}
+      FROM threads t
+      WHERE t.account_id = ?
+      ORDER BY t.last_message_at DESC
       LIMIT ? OFFSET ?
     `).all(accountId, limit, offset)
   }

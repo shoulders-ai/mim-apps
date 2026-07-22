@@ -413,7 +413,9 @@ describe('mail backend index', () => {
 
     it('agents: one Mail agent allowlisted to exactly the named set', () => {
       expect(Object.keys(agents)).toEqual(['mail'])
-      expect(agents.mail.name).toBe('Mail')
+      // Distinct from the app's own "Mail" sidebar row — same label twice
+      // with only an icon differing is indistinguishable.
+      expect(agents.mail.name).toBe('Mail Agent')
       expect(agents.mail.tools.sort()).toEqual(
         Object.values(tools)
           .filter((t) => typeof t.name === 'string')
