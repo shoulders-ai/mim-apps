@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { state, setRenderFn, showToast, closeTopLayer, openMenuName } from './state.js'
+import { state, setRenderFn, showToast, pauseToast, resumeToast, closeTopLayer, openMenuName } from './state.js'
 
 function resetLayers() {
   for (const k of Object.keys(state.menus)) state.menus[k] = false
@@ -75,18 +75,18 @@ describe('showToast', () => {
     setRenderFn(() => {})
   })
 
-  it('shows for 1.6s without an action', () => {
+  it('shows for 2.5s without an action', () => {
     showToast('Sent to Anna Schmidt')
     expect(state.toast.msg).toBe('Sent to Anna Schmidt')
-    vi.advanceTimersByTime(1599)
+    vi.advanceTimersByTime(2499)
     expect(state.toast.msg).toBe('Sent to Anna Schmidt')
     vi.advanceTimersByTime(2)
     expect(state.toast.msg).toBe('')
   })
 
-  it('shows for 5s when carrying an action', () => {
+  it('shows for 8s when carrying an action', () => {
     showToast('Archived', { label: 'Undo', fn: () => {} })
-    vi.advanceTimersByTime(4999)
+    vi.advanceTimersByTime(7999)
     expect(state.toast.msg).toBe('Archived')
     vi.advanceTimersByTime(2)
     expect(state.toast.msg).toBe('')
@@ -98,7 +98,20 @@ describe('showToast', () => {
     showToast('Second')
     vi.advanceTimersByTime(1000)
     expect(state.toast.msg).toBe('Second')
-    vi.advanceTimersByTime(700)
+    vi.advanceTimersByTime(1600)
+    expect(state.toast.msg).toBe('')
+  })
+
+  it('pauseToast holds the message; resumeToast restarts a short timer', () => {
+    showToast('Archived', { label: 'Undo', fn: () => {} })
+    vi.advanceTimersByTime(7000)
+    pauseToast()
+    vi.advanceTimersByTime(60000)
+    expect(state.toast.msg).toBe('Archived')
+    resumeToast()
+    vi.advanceTimersByTime(2999)
+    expect(state.toast.msg).toBe('Archived')
+    vi.advanceTimersByTime(2)
     expect(state.toast.msg).toBe('')
   })
 })

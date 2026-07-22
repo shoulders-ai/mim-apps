@@ -69,6 +69,7 @@ export function resolveKey(scope, key, mods = {}, ctx = {}) {
 
   // Non-input surfaces from here down.
   if (key === '/') return 'focus-search'
+  if (key === '?') return 'help'
 
   if (scope === 'list') {
     if (key === 'j' || key === 'ArrowDown') return 'list-next'
@@ -77,6 +78,7 @@ export function resolveKey(scope, key, mods = {}, ctx = {}) {
     if (key === 'e') return 'archive'
     if (key === 'r') return 'reply'
     if (key === 'c') return 'compose'
+    if (key === 'z') return 'undo-toast'
     if (key === '1' || key === '2' || key === '3' || key === '4') return `tab-${key}`
     return null
   }
@@ -87,6 +89,8 @@ export function resolveKey(scope, key, mods = {}, ctx = {}) {
     if (key === 'e') return 'archive'
     if (key === 'r') return 'reply'
     if (key === 'u') return 'thread-up'
+    if (key === 'z') return 'undo-toast'
+    if (key === 'g') return 'open-gmail'
     if (key === 'Enter') return 'toggle-expand'
     // WIDE: both panes are visible; list-only conveniences stay reachable.
     if (ctx.wide) {

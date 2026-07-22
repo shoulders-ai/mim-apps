@@ -13,33 +13,44 @@ const TABS = [
   { id: 'drafts', label: 'Drafts', key: '4' },
 ]
 
-// ── Header (40px) ──
+// ── Command bar (36px — app label, tabs, search, actions) ──
 
-export function renderHeader() {
-  const hdr = qs('#hdr')
-  if (!hdr) return
+export function renderCommandBar() {
+  const bar = qs('#cmdBar')
+  if (!bar) return
   const connected = state.conn.connected && state.route.view !== 'onboarding'
   if (!connected) {
-    hdr.innerHTML = `<span class="hdr-title">Mail</span>`
+    bar.innerHTML = `<span class="cmd-app">Mail</span>`
     return
   }
   const compact = state.compact
   const searchFocused = document.activeElement?.id === 'searchInput'
   const searchVal = qs('#searchInput')?.value ?? state.inbox.query
-  hdr.innerHTML = `
-    <span class="hdr-title">Mail</span>
-    <div class="hdr-right">
+  const voicesDot = state.conn.seedState === 'ready' || state.voices.hasPending
+  const inMail = state.route.view !== 'voices'
+  const tabs = TABS.map(t => `
+    <button type="button" class="tab${inMail && state.inbox.tab === t.id ? ' active' : ''}"
+      data-action="switch-tab" data-tab="${t.id}" title="${t.label} (${t.key})">${t.label}</button>`).join('')
+  const focusedTab = bar.contains(document.activeElement)
+    ? document.activeElement.dataset.tab || document.activeElement.dataset.action
+    : null
+  bar.innerHTML = `
+    <span class="cmd-app">Mail</span>
+    ${tabs}
+    <span class="cmd-sep" aria-hidden="true"></span>
+    <button type="button" class="tab${state.route.view === 'voices' ? ' active' : ''}" data-action="open-voices"
+      title="Voices &amp; Learning">Voices${voicesDot ? '<span class="pill-dot" aria-hidden="true"></span>' : ''}</button>
+    <div class="cmd-right">
       <div class="search-box${compact ? ' compact' : ''}" id="searchBox">
         ${icon('search')}
         <input id="searchInput" class="search-input" type="text" data-region="input"
           placeholder="Search mail" title="Search mail (/)" value="${escapeAttr(searchVal)}"
           aria-label="Search mail">
       </div>
-      <button type="button" class="btn-hdr" id="btnCompose" data-action="compose" title="Compose (c)">
-        ${icon('compose')}${compact ? '' : '<span>Compose</span>'}</button>
+      <button type="button" class="icon-btn" id="btnCompose" data-action="compose" title="Compose (c)">${icon('compose')}</button>
       <button type="button" class="icon-btn${state.refreshing ? ' spinning' : ''}" id="btnRefresh"
         data-action="refresh" title="Refresh">${icon('refresh')}</button>
-      <button type="button" class="icon-btn" id="btnSettings" data-action="open-settings"
+      <button type="button" class="icon-btn${state.menus.settings ? ' menu-open' : ''}" id="btnSettings" data-action="open-settings"
         title="Settings" aria-haspopup="true">${icon('gear')}</button>
     </div>`
   const input = qs('#searchInput')
@@ -50,6 +61,10 @@ export function renderHeader() {
     input.focus()
     const end = input.value.length
     try { input.setSelectionRange(end, end) } catch {}
+  }
+  if (focusedTab) {
+    (qs(`#cmdBar [data-tab="${CSS.escape(focusedTab)}"]`)
+      || qs(`#cmdBar [data-action="${CSS.escape(focusedTab)}"]`))?.focus()
   }
 }
 
@@ -64,39 +79,14 @@ function onSearchInput(e) {
   searchDebounced()
 }
 
-// ── Tab row (36px) ──
-
-export function renderTabRow() {
-  const bar = qs('#tabRow')
-  if (!bar) return
-  const voicesDot = state.conn.seedState === 'ready' || state.voices.hasPending
-  const pills = TABS.map(t => `
-    <button type="button" class="tab-pill${state.inbox.tab === t.id ? ' active' : ''}"
-      data-action="switch-tab" data-tab="${t.id}" title="${t.label} (${t.key})">${t.label}</button>`).join('')
-  const focusedTab = bar.contains(document.activeElement)
-    ? document.activeElement.dataset.tab || document.activeElement.dataset.action
-    : null
-  bar.innerHTML = `
-    <div class="tabs-left">${pills}</div>
-    <div class="tabs-right">
-      <button type="button" class="tab-pill${state.route.view === 'voices' ? ' active' : ''}" data-action="open-voices"
-        title="Voices &amp; Learning">Voices${voicesDot ? '<span class="pill-dot" aria-hidden="true"></span>' : ''}</button>
-      <span class="sync-cell" id="syncCell"></span>
-    </div>
-    <div class="progress-line" id="syncProgress" hidden></div>`
-  if (focusedTab) {
-    (qs(`#tabRow [data-tab="${CSS.escape(focusedTab)}"]`)
-      || qs(`#tabRow [data-action="${CSS.escape(focusedTab)}"]`))?.focus()
-  }
-  renderSyncCell()
-}
+// ── Sync cell (status bar left slot; a transient message takes priority) ──
 
 export function renderSyncCell() {
-  const cell = qs('#syncCell')
+  const cell = qs('#statusSync')
   const line = qs('#syncProgress')
   if (!cell) return
-  if (state.banner === 'reconnect') {
-    // The banner owns auth state (§5.6) — the cell yields.
+  if (state.toast.msg || state.banner === 'reconnect') {
+    // Messages own the slot; the banner owns auth state (§5.6).
     cell.innerHTML = ''
     if (line) line.hidden = true
     return
@@ -104,7 +94,7 @@ export function renderSyncCell() {
   const bf = state.conn.backfill
   if (bf.state === 'running') {
     const total = bf.total > 0 ? `~${fmtCount(bf.total)}` : '…'
-    cell.innerHTML = `${fmtCount(bf.done)} / ${total}`
+    cell.innerHTML = `syncing ${fmtCount(bf.done)} / ${total}`
     if (line && bf.total > 0) {
       line.hidden = false
       line.style.width = `${Math.min(100, (bf.done / bf.total) * 100)}%`
@@ -138,54 +128,57 @@ function emptyText() {
   const { tab, query } = state.inbox
   if (query) return `No matches for “${query}”.`
   if (tab === 'inbox') return 'Inbox zero.'
-  if (tab === 'sent') return 'Nothing sent in this window.'
+  if (tab === 'sent') {
+    const days = state.settings.syncWindowDays
+    return days ? `No sent mail in the last ${days} days.` : 'No sent mail synced yet.'
+  }
   if (tab === 'drafts') return 'No drafts.'
   return 'Nothing here yet.'
 }
 
+// One-line 28px rows (§3.2): marker · sender · subject—snippet · flags ·
+// time. The subject renders at EVERY pane width — no compact variant.
 function threadRowHtml(row) {
-  const compact = state.listCompact
-  const selected = state.inbox.selectedId === row.id && state.route.view === 'thread'
+  const selected = state.inbox.selectedId === row.id
   const showTo = state.inbox.tab === 'sent'
   const fromLabel = showTo
     ? `To: ${row.to.map(data.addrDisplay).filter(Boolean).join(', ') || '—'}`
     : (row.fromName || row.fromEmail || '—')
-  const meta = `
-    ${row.messageCount > 1 ? `<span class="trow-count">⌗${row.messageCount}</span>` : ''}
-    ${row.hasAttachments ? `<span class="trow-clip">${icon('paperclip', 12)}</span>` : ''}
-    <span class="trow-time">${escapeHtml(fmtTime(row.lastMessageAt))}</span>`
   return `<button type="button" role="option" aria-selected="${selected}" data-action="open-row" data-id="${escapeAttr(row.id)}"
-    class="trow${row.unread ? ' unread' : ''}${selected ? ' selected' : ''}${compact ? ' compact' : ''}"
+    class="trow${row.unread ? ' unread' : ''}${selected ? ' selected' : ''}"
     title="${escapeAttr(row.subject || '(no subject)')}">
-    <span class="trow-l1">
-      ${row.unread ? '<span class="unread-dot" aria-hidden="true"></span>' : ''}
-      <span class="trow-from">${escapeHtml(fromLabel)}</span>
-      <span class="trow-meta">${meta}</span>
-    </span>
-    ${compact ? '' : `<span class="trow-l2">
+    <span class="trow-marker" aria-hidden="true">${row.unread ? '<span class="unread-dot"></span>' : ''}</span>
+    <span class="trow-from">${escapeHtml(fromLabel)}</span>
+    <span class="trow-main">
       <span class="trow-subject">${escapeHtml(row.subject || '(no subject)')}</span><span class="trow-snip">${row.snippet ? ` — ${escapeHtml(row.snippet)}` : ''}</span>
-    </span>`}
+    </span>
+    <span class="trow-flags">
+      ${row.messageCount > 1 ? `<span class="trow-count">⌗${row.messageCount}</span>` : ''}
+      ${row.hasAttachments ? `<span class="trow-clip">${icon('paperclip', 12)}</span>` : ''}
+      <span class="trow-arch" role="button" tabindex="-1" data-action="row-archive" data-id="${escapeAttr(row.id)}"
+        title="Archive (e)">${icon('archive', 12)}</span>
+    </span>
+    <span class="trow-time">${escapeHtml(fmtTime(row.lastMessageAt))}</span>
   </button>`
 }
 
 function draftRowHtml(row) {
-  const compact = state.listCompact
   const toNames = row.to.map(data.addrDisplay).filter(Boolean).join(', ') || '—'
   const chip = row.state === 'approved'
-    ? '<span class="chip-state approved">Approved</span>'
+    ? '<span class="chip-state">approved</span>'
     : row.state === 'send_failed'
-      ? '<span class="chip-state failed">Send failed</span>'
+      ? '<span class="chip-state failed">send failed</span>'
       : ''
   return `<button type="button" role="option" aria-selected="false" data-action="open-draft-row" data-id="${escapeAttr(row.draftId)}"
-    data-thread="${escapeAttr(row.threadId || '')}" class="trow${compact ? ' compact' : ''}"
+    data-thread="${escapeAttr(row.threadId || '')}" class="trow"
     title="${escapeAttr(row.subject || '(no subject)')}">
-    <span class="trow-l1">
-      <span class="trow-from">To: ${escapeHtml(toNames)}</span>
-      <span class="trow-meta">${chip}<span class="trow-time">${escapeHtml(fmtTime(row.updatedAt))}</span></span>
-    </span>
-    ${compact ? '' : `<span class="trow-l2">
+    <span class="trow-marker" aria-hidden="true"></span>
+    <span class="trow-from">To: ${escapeHtml(toNames)}</span>
+    <span class="trow-main">
       <span class="trow-subject">${escapeHtml(row.subject || '(no subject)')}</span><span class="trow-snip">${row.snippet ? ` — ${escapeHtml(row.snippet)}` : ''}</span>
-    </span>`}
+    </span>
+    <span class="trow-flags">${chip}</span>
+    <span class="trow-time">${escapeHtml(fmtTime(row.updatedAt))}</span>
   </button>`
 }
 
@@ -267,7 +260,7 @@ export function openSelected() {
     return
   }
   if (state.breakpoint === 'wide' && state.route.view === 'thread') {
-    qs('#threadPane')?.focus()
+    qs('#threadScroll')?.focus()
   } else {
     data.openThread(row.id)
   }
@@ -367,6 +360,13 @@ export const inboxActions = {
     const id = el.dataset.id
     state.inbox.selectedId = id
     data.openThread(id)
+  },
+  'row-archive': (el, e) => {
+    // Mouse affordance for e — the span sits inside the row button, so stop
+    // the row's open from firing too.
+    e?.stopPropagation?.()
+    state.inbox.selectedId = el.dataset.id
+    archiveSelected()
   },
   'open-draft-row': (el) => {
     openDraftRow(el.dataset.id, el.dataset.thread || null)

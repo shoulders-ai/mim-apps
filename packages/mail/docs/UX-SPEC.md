@@ -1,5 +1,9 @@
 # Mail — UX Specification (binding)
 
+> Visual system amendment: [DESIGN.md](DESIGN.md) supersedes §1–§3 of this
+> file (typography, density, chrome). Deferred ruling items live in
+> [BACKLOG.md](BACKLOG.md).
+
 Author: UX owner (Fable). Wave 3 implements exactly this; the same owner
 audits the built UI against §8 afterwards. Where this file and
 [CONTRACTS.md](CONTRACTS.md) disagree on data/tool shapes, CONTRACTS wins;

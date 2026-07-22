@@ -142,3 +142,26 @@ describe('resolveKey — comment box', () => {
     expect(resolveKey('comment', 'c', {})).toBeNull()
   })
 })
+
+describe('resolveKey — ruling additions (z, ?, g)', () => {
+  it('z fires undo-toast in list and thread scopes only', () => {
+    expect(resolveKey('list', 'z', {})).toBe('undo-toast')
+    expect(resolveKey('thread', 'z', {})).toBe('undo-toast')
+    expect(resolveKey('input', 'z', {})).toBeNull()
+    expect(resolveKey('editor', 'z', {})).toBeNull()
+    expect(resolveKey('strip', 'z', {})).toBeNull()
+  })
+
+  it('? opens help from non-input scopes', () => {
+    expect(resolveKey('list', '?', { shift: true })).toBe('help')
+    expect(resolveKey('thread', '?', { shift: true })).toBe('help')
+    expect(resolveKey('voices', '?', { shift: true })).toBe('help')
+    expect(resolveKey('input', '?', { shift: true })).toBeNull()
+    expect(resolveKey('editor', '?', { shift: true })).toBeNull()
+  })
+
+  it('g opens the thread in Gmail from thread scope only', () => {
+    expect(resolveKey('thread', 'g', {})).toBe('open-gmail')
+    expect(resolveKey('list', 'g', {})).toBeNull()
+  })
+})

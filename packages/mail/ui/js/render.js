@@ -2,7 +2,7 @@
 // mounts banner/menus/toast, owns the ResizeObserver breakpoint, the
 // action registry (clicks + shortcuts), and the Esc cascade.
 
-import { state, setRenderFn, render, showToast, closeTopLayer, closeMenus, openMenuName } from './state.js'
+import { state, setRenderFn, render, showToast, closeTopLayer, closeMenus, openMenu, openMenuName } from './state.js'
 import { escapeHtml, qs } from './utils.js'
 import { SVG_DEFS, icon } from './icons.js'
 import { initShortcuts, regionOf } from './shortcuts.js'
@@ -23,7 +23,7 @@ let lastShell = ''
 function shellSignature() {
   return [
     state.route.view === 'thread' ? 'thread' : state.route.view,
-    state.breakpoint, state.listCompact, state.conn.connected,
+    state.breakpoint, state.conn.connected,
   ].join('|')
 }
 
@@ -57,18 +57,16 @@ function renderMain() {
     const showList = state.breakpoint === 'wide' || state.route.view === 'inbox'
     const showThread = state.route.view === 'thread'
     content.innerHTML = `<div class="mail-shell" id="mailShell">
-      <div class="tabrow" id="tabRow"></div>
       <div class="panes">
         ${showList ? inbox.listPaneHtml() : ''}
         ${showThread ? thread.threadPaneHtml() : ''}
-        ${!showThread && state.breakpoint === 'wide' ? '<div class="thread-pane empty-pane" id="threadPane" tabindex="-1" data-region="thread"><div class="pane-empty">Select a thread</div></div>' : ''}
+        ${!showThread && state.breakpoint === 'wide' ? '<div class="thread-pane empty-pane" id="threadPane"><div class="pane-empty">Select a thread — j/k</div></div>' : ''}
       </div>
     </div>`
     inbox.observeSentinel()
     const pane = qs('#listPane')
     if (pane) pane.scrollTop = scroll
   }
-  inbox.renderTabRow()
   inbox.renderList()
   if (state.route.view === 'thread') {
     thread.updateThread()
@@ -76,30 +74,108 @@ function renderMain() {
   }
 }
 
+// ── Status bar (§3.2 — sync + messages left, position + hints right) ──
+
+const REGION_HINTS = {
+  list: 'j/k move · e archive · r reply · c compose · / search · ? help',
+  thread: 'j/k next · e archive · r reply · g gmail · u list',
+  editor: 'tab next change · ⌘⏎ approve',
+  strip: '⏎ accept · ⌫ reject · c comment · ⇧A all',
+  confirm: '⌘⏎ send · esc cancel',
+}
+
+function renderStatusBar() {
+  const bar = qs('#statusBar')
+  if (!bar) return
+  const connected = state.conn.connected && state.route.view !== 'onboarding'
+  bar.hidden = !connected
+  if (!connected) return
+  if (!qs('#statusMsg', bar)) {
+    bar.innerHTML = `
+      <span class="status-left"><span id="statusMsg" role="status"></span><span class="sync-cell" id="statusSync"></span></span>
+      <span class="status-right"><span class="status-pos mono" id="statusPos"></span><span class="status-hints mono" id="statusHints"></span></span>
+      <div class="progress-line" id="syncProgress" hidden></div>`
+  }
+  const pos = qs('#statusPos')
+  if (pos) {
+    const rows = state.inbox.threads
+    const i = rows.findIndex(r => r.id === state.inbox.selectedId)
+    const text = state.route.view !== 'voices' && rows.length && i !== -1 ? `${i + 1}/${rows.length}` : ''
+    if (pos.textContent !== text) pos.textContent = text
+  }
+  const hints = qs('#statusHints')
+  if (hints) {
+    const region = state.studio.confirm
+      ? 'confirm'
+      : regionOf(document.activeElement) || (state.route.view === 'thread' ? 'thread' : 'list')
+    const text = state.compact ? '' : (REGION_HINTS[region] || REGION_HINTS.list)
+    if (hints.textContent !== text) hints.textContent = text
+  }
+  inbox.renderSyncCell()
+}
+
+// ── Help sheet (?) ──
+
+function helpSheetHtml() {
+  const rows = (pairs) => pairs.map(([k, label]) =>
+    `<div class="help-row"><span>${label}</span><span class="mono help-key">${k}</span></div>`).join('')
+  return `<div class="menu help-sheet" role="dialog" aria-label="Keyboard shortcuts" data-menu="help">
+    <div class="help-cols">
+      <div>
+        <div class="micro">List</div>
+        ${rows([['j / k', 'Move'], ['⏎ / o', 'Open'], ['e', 'Archive'], ['z', 'Undo'], ['r', 'Reply'], ['c', 'Compose'], ['1–4', 'Tabs'], ['/', 'Search']])}
+        <div class="micro">Thread</div>
+        ${rows([['j / k', 'Next / previous'], ['⏎', 'Expand message'], ['g', 'Open in Gmail'], ['u', 'Back to list']])}
+      </div>
+      <div>
+        <div class="micro">Suggestions</div>
+        ${rows([['Tab', 'Next change'], ['⏎', 'Accept'], ['⌫', 'Reject'], ['c', 'Comment'], ['⇧A', 'Accept all']])}
+        <div class="micro">Draft</div>
+        ${rows([['⌘⏎', 'Approve / Send'], ['Esc', 'Back out']])}
+      </div>
+    </div>
+  </div>`
+}
+
+let bannerRendered = ''
+
 function renderBanner() {
   const layer = qs('#bannerLayer')
   if (!layer) return
   if (state.banner !== 'reconnect' || state.route.view === 'onboarding') {
-    layer.innerHTML = ''
+    if (bannerRendered !== '') {
+      bannerRendered = ''
+      layer.innerHTML = ''
+    }
     return
   }
   const rc = state.reconnect
   let action
   if (rc.waiting) {
-    const left = Math.max(0, Math.ceil((rc.deadline - Date.now()) / 1000))
+    // The countdown is aria-hidden and updated via textContent below so the
+    // role=alert node never re-announces per tick.
     action = `<span class="banner-wait"><span class="spinner" aria-hidden="true"></span>
-      Waiting for Google… <span class="mono">${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}</span></span>
+      Waiting for Google… <span class="mono" id="bannerCountdown" aria-hidden="true"></span></span>
       <button type="button" class="btn-quiet" data-action="reconnect-copy" title="Copy the consent URL">Copy link</button>`
   } else if (rc.connecting) {
     action = `<span class="banner-wait"><span class="spinner" aria-hidden="true"></span> Connecting…</span>`
   } else {
     action = `<button type="button" class="btn-banner" data-action="reconnect" title="Re-open Google consent">Reconnect</button>`
   }
-  layer.innerHTML = `<div class="banner" role="alert">
+  const html = `<div class="banner" role="alert">
     <span class="banner-icon">${icon('alert-triangle')}</span>
-    <span class="banner-text">Gmail connection expired — your mail is paused.${rc.error ? ` ${escapeHtml(rc.error)}` : ''}</span>
+    <span class="banner-text">Gmail connection expired — your mail is paused. Reconnecting takes about 20 seconds.${rc.error ? ` ${escapeHtml(rc.error)}` : ''}</span>
     ${action}
   </div>`
+  if (bannerRendered !== html) {
+    bannerRendered = html
+    layer.innerHTML = html
+  }
+  const cd = qs('#bannerCountdown')
+  if (cd && rc.waiting) {
+    const left = Math.max(0, Math.ceil((rc.deadline - Date.now()) / 1000))
+    cd.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`
+  }
 }
 
 // ── Menus ──
@@ -115,6 +191,7 @@ function menuHtml() {
     case 'history': return studio.historyMenuHtml()
     case 'threadMore': return thread.threadMoreMenuHtml()
     case 'voiceMore': return voices.voiceMoreMenuHtml()
+    case 'help': return helpSheetHtml()
     default: return ''
   }
 }
@@ -172,10 +249,11 @@ function menuKeydown(e) {
 // ── Full render ──
 
 function renderAll() {
-  inbox.renderHeader()
+  inbox.renderCommandBar()
   renderBanner()
   renderMain()
   renderMenus()
+  renderStatusBar()
   renderToast()
 }
 
@@ -325,6 +403,27 @@ function dispatch(action, detail = {}) {
     }
     case 'accept-all': hunkSurface().acceptAll(); return true
     case 'comment-submit': hunkSurface().submitComment(); return true
+    case 'undo-toast': {
+      // z — fire the active status-line action (Undo etc.), if any.
+      if (!state.toast.action) return false
+      actions['toast-action']()
+      return true
+    }
+    case 'help': {
+      if (openMenuName() === 'help') {
+        closeMenus()
+        render()
+        return true
+      }
+      openMenu('help', { x: window.innerWidth / 2 - 170, y: Math.max(60, window.innerHeight / 5) })
+      return true
+    }
+    case 'open-gmail': {
+      const t = state.thread.thread
+      if (!t?.gmailId) return false
+      window.open(`https://mail.google.com/mail/u/0/#all/${encodeURIComponent(t.gmailId)}`, '_blank')
+      return true
+    }
     case 'primary': {
       // ⌘⏎ is the studio's primary path only — never from the search box
       // or other surfaces (§3.4.4).
@@ -397,6 +496,12 @@ function handleEscape() {
   }
   if (state.breakpoint === 'narrow' && state.route.view === 'thread') {
     data.backToList()
+    // §5.2: every back-to-list path puts focus on the selected row.
+    requestAnimationFrame(() => {
+      const sel = state.inbox.selectedId
+      if (sel) qs(`#listRows [data-id="${CSS.escape(String(sel))}"]`)?.focus()
+      else qs('#listRows .trow')?.focus()
+    })
     return true
   }
   return false
@@ -451,11 +556,9 @@ function initBreakpoint() {
   const apply = (w) => {
     const bp = w >= 880 ? 'wide' : 'narrow'
     const compact = w < 560
-    const listCompact = bp === 'narrow' && w < 400
-    if (bp !== state.breakpoint || compact !== state.compact || listCompact !== state.listCompact) {
+    if (bp !== state.breakpoint || compact !== state.compact) {
       state.breakpoint = bp
       state.compact = compact
-      state.listCompact = listCompact
       document.body.classList.toggle('narrow', bp === 'narrow')
       document.body.classList.toggle('compact', compact)
       render()

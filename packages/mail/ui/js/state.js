@@ -6,8 +6,7 @@ let _render = () => {}
 export const state = {
   tools: {},              // export key -> publicName (§7.2); empty until boot
   breakpoint: 'wide',     // 'wide' | 'narrow'  (ResizeObserver)
-  compact: false,         // app root < 560px (header/footer collapse)
-  listCompact: false,     // list pane < 400px (32px single-line rows)
+  compact: false,         // app root < 560px (command bar collapses labels)
   route: { view: 'boot', threadId: null, draftId: null },
                           // view: 'boot'|'onboarding'|'inbox'|'thread'|'voices'
   conn: {
@@ -56,6 +55,7 @@ export const state = {
   menus: {
     settings: false, voicePicker: false, dismissAll: false,
     overflow: false, history: false, threadMore: false, voiceMore: false,
+    help: false,
   },
   menuAnchor: null,       // { x, y, invokerId } for the open menu
 }
@@ -70,14 +70,29 @@ export function render() {
 
 let toastTimer = null
 
+function clearToast() {
+  toastTimer = null
+  state.toast = { msg: '', action: null }
+  render()
+}
+
+// Status-line messages (§5.5): 2.5s plain, 8s when carrying an action so
+// there is time to reach Undo; hover/focus pauses the timer.
 export function showToast(msg, action = null) {
   if (toastTimer) clearTimeout(toastTimer)
   state.toast = { msg, action }
   render()
-  toastTimer = setTimeout(() => {
-    state.toast = { msg: '', action: null }
-    render()
-  }, action ? 5000 : 1600)
+  toastTimer = setTimeout(clearToast, action ? 8000 : 2500)
+}
+
+export function pauseToast() {
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = null
+}
+
+export function resumeToast() {
+  if (!state.toast.msg || toastTimer) return
+  toastTimer = setTimeout(clearToast, 3000)
 }
 
 export function openMenuName() {

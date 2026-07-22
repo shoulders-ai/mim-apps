@@ -2,9 +2,34 @@
 // quoted-trail folding, the draft chip, and the studio dock host.
 
 import { state, render, openMenu, closeMenus } from './state.js'
-import { escapeHtml, escapeAttr, qs, fmtTime, fmtLongTime } from './utils.js'
+import { escapeHtml, escapeAttr, qs, fmtTime, fmtLongTime, cleanBodyText, cleanSnippet } from './utils.js'
 import { icon } from './icons.js'
 import * as data from './data.js'
+
+// Display-side body cleanup (utils.cleanBodyText re-exported under the
+// view's name so tests pin the reading-pane contract here).
+export const cleanBody = cleanBodyText
+
+// Escape + linkify in one pass: tokenize the RAW text so URLs are matched
+// before escaping, then escape each side. Anchors are the app's only
+// pointer-cursor elements (§7.1); newsletters are unreadable without them.
+export function linkify(text) {
+  const raw = String(text ?? '')
+  const re = /https?:\/\/[^\s<>"')\]]+/g
+  let html = ''
+  let last = 0
+  let m
+  while ((m = re.exec(raw))) {
+    let url = m[0]
+    const trail = /[.,;:!?]+$/.exec(url)
+    if (trail) url = url.slice(0, url.length - trail[0].length)
+    html += escapeHtml(raw.slice(last, m.index))
+    html += `<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`
+    last = m.index + url.length
+  }
+  html += escapeHtml(raw.slice(last))
+  return html
+}
 
 // Fold a trailing quote block ("On … wrote:" + "> " lines) behind a toggle.
 export function foldQuoted(text) {
@@ -27,9 +52,11 @@ export function foldQuoted(text) {
 }
 
 export function threadPaneHtml() {
-  return `<div class="thread-pane" id="threadPane" tabindex="-1" data-region="thread">
+  // tabindex lives on the SCROLL CONTAINER, not the pane — focusing the pane
+  // left arrow/PageDown/Space dead because the child owns the overflow.
+  return `<div class="thread-pane" id="threadPane">
     <div class="th-head" id="threadHead"></div>
-    <div class="th-scroll" id="threadScroll">
+    <div class="th-scroll" id="threadScroll" tabindex="-1" data-region="thread">
       <div class="th-col">
         <div id="threadMessages"></div>
         <div id="draftChip"></div>
@@ -56,25 +83,34 @@ function messageHtml(msg) {
       title="Expand message">
       <span class="msg-caret" aria-hidden="true">${icon('chevron-right', 12)}</span>
       <span class="msg-sender">${escapeHtml(sender)}</span>
+      <span class="msg-snip">${escapeHtml(cleanSnippet(msg.snippet))}</span>
       <span class="msg-date">${escapeHtml(fmtTime(msg.date))}</span>
-      <span class="msg-snip">${escapeHtml(msg.snippet)}</span>
     </button>`
   }
-  const { main, quoted } = foldQuoted(msg.body)
+  const { main, quoted } = foldQuoted(cleanBody(msg.body))
   const showQuoted = state.thread.unquoted.has(msg.id)
+  const addr = msg.isFromMe ? (state.conn.email || '') : (msg.fromEmail || '')
+  const showAddr = addr && addr.toLowerCase() !== sender.toLowerCase()
+  const recipients = recipientsLabel(msg)
+  const quotedLines = quoted ? quoted.split('\n').filter(l => l.trim() !== '').length : 0
   return `<div class="msg-open">
     <button type="button" class="msg-openhead" data-action="toggle-msg" data-id="${escapeAttr(msg.id)}"
       title="Collapse message">
       <span class="msg-caret" aria-hidden="true">${icon('chevron-down', 12)}</span>
-      <span class="msg-sender">${escapeHtml(sender)}</span>
-      <span class="msg-date">— ${escapeHtml(fmtLongTime(msg.date))}</span>
-      <span class="msg-to">${escapeHtml(recipientsLabel(msg))}</span>
+      <span class="msg-head-main">
+        <span class="msg-head-l1">
+          <span class="msg-sender">${escapeHtml(sender)}</span>
+          ${showAddr ? `<span class="msg-addr">${escapeHtml(addr)}</span>` : ''}
+        </span>
+        ${recipients && recipients !== 'to you' ? `<span class="msg-head-l2">${escapeHtml(recipients)}</span>` : ''}
+      </span>
+      <span class="msg-date">${escapeHtml(fmtLongTime(msg.date))}</span>
     </button>
-    <div class="msg-body">${escapeHtml(main)}</div>
+    <div class="msg-body">${linkify(main)}</div>
     ${quoted ? (showQuoted
-      ? `<button type="button" class="quote-toggle" data-action="toggle-quote" data-id="${escapeAttr(msg.id)}" title="Hide quoted trail">··· hide quoted</button>
-         <div class="msg-body msg-quoted">${escapeHtml(quoted)}</div>`
-      : `<button type="button" class="quote-toggle" data-action="toggle-quote" data-id="${escapeAttr(msg.id)}" title="Show quoted trail">··· show quoted</button>`) : ''}
+      ? `<button type="button" class="quote-toggle" data-action="toggle-quote" data-id="${escapeAttr(msg.id)}" title="Hide quoted trail">× hide quoted</button>
+         <div class="msg-body msg-quoted">${linkify(quoted)}</div>`
+      : `<button type="button" class="quote-toggle" data-action="toggle-quote" data-id="${escapeAttr(msg.id)}" title="Show quoted trail">› quoted (${quotedLines} line${quotedLines === 1 ? '' : 's'})</button>`) : ''}
   </div>`
 }
 
@@ -92,7 +128,7 @@ export function updateThread() {
       ${icon('arrow-left')}<span>Inbox</span></button>` : ''}
     <span class="th-subject">${escapeHtml(freshCompose ? 'New message' : (t?.subject || '(no subject)'))}</span>
     ${freshCompose ? '' : `<span class="th-actions">
-      <button type="button" class="btn-hdr" data-action="thread-reply" title="Reply (r)">${icon('reply')}<span>Reply</span></button>
+      <button type="button" class="icon-btn" data-action="thread-reply" title="Reply (r)">${icon('reply')}</button>
       <button type="button" class="icon-btn" data-action="thread-archive" title="Archive (e)">${icon('archive')}</button>
       <button type="button" class="icon-btn" id="btnThreadMore" data-action="thread-more" title="More" aria-haspopup="true">${icon('dots')}</button>
     </span>`}`
@@ -122,7 +158,7 @@ export function updateThread() {
     const draft = state.thread.drafts[0]
     chip.innerHTML = draft && !state.studio.open
       ? `<button type="button" class="draft-chip" data-action="continue-draft" data-id="${escapeAttr(draft.id)}"
-          title="Open the draft">Draft in progress — Continue</button>`
+          title="Open the draft (r)">Draft in progress — continue (r)</button>`
       : ''
   }
 }

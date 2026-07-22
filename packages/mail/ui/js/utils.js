@@ -20,6 +20,45 @@ export function escapeHtml(value) {
 
 export const escapeAttr = escapeHtml
 
+// Gmail API snippets arrive HTML-escaped (&#39; &amp; …). Decode numeric and
+// the basic named entities; &amp; goes LAST so double-escaped text decodes
+// exactly one level.
+export function decodeEntities(value) {
+  return String(value ?? '')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+}
+
+// Invisible characters newsletters use to pad preview text: ZWNJ, ZWJ, CGJ,
+// ZWSP, soft hyphen, word joiner, BOM.
+const INVISIBLES = /[\u00ad\u034f\u200b\u200c\u200d\u2060\ufeff]/g
+
+// List-row snippet: decode entities, drop invisible padding, collapse runs
+// of whitespace.
+export function cleanSnippet(value) {
+  return decodeEntities(String(value ?? ''))
+    .replace(INVISIBLES, '')
+    .replace(/[\s\u00a0]+/g, " ")
+    .trim()
+}
+
+// Reading-pane body: normalize newlines, drop invisible padding, trim
+// per-line trailing whitespace, collapse 3+ blank-line runs to one.
+export function cleanBodyText(value) {
+  return String(value ?? '')
+    .replace(/\r\n?/g, '\n')
+    .replace(INVISIBLES, '')
+    .replace(/[ \t\u00a0]+$/gm, "")
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/^\s+|\s+$/g, '')
+}
+
 // Debounce with flush/cancel — draft_edit needs "debounced 800ms + flush on
 // blur and before any tool call that reads the body".
 export function debounce(fn, ms) {
@@ -54,7 +93,8 @@ export function debounce(fn, ms) {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-// List-row time: `14:32` today, `3 Jul` this year, `Jul 24` older (§3.2).
+// List-row time: `14:32` today, `3 Jul` this year, `Jul ’24` older — the
+// apostrophe keeps prior years from reading as day-of-month (§3.2).
 export function fmtTime(ms, now = Date.now()) {
   const t = Number(ms)
   if (!t || Number.isNaN(t)) return ''
@@ -66,10 +106,11 @@ export function fmtTime(ms, now = Date.now()) {
   if (d.getFullYear() === n.getFullYear()) {
     return `${d.getDate()} ${MONTHS[d.getMonth()]}`
   }
-  return `${MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`
+  return `${MONTHS[d.getMonth()]} ’${String(d.getFullYear()).slice(2)}`
 }
 
-// Expanded-message header time: `today 14:32` / `3 Jul 14:32` / `Jul 24`.
+// Expanded-message header time: `today 14:32` / `3 Jul 14:32` /
+// `3 Jul 2024 14:32` — prior years always carry the full year.
 export function fmtLongTime(ms, now = Date.now()) {
   const t = Number(ms)
   if (!t || Number.isNaN(t)) return ''
@@ -80,7 +121,7 @@ export function fmtLongTime(ms, now = Date.now()) {
     return `today ${hm}`
   }
   if (d.getFullYear() === n.getFullYear()) return `${d.getDate()} ${MONTHS[d.getMonth()]} ${hm}`
-  return `${MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} ${hm}`
 }
 
 // 1240 -> "1,240"

@@ -54,7 +54,7 @@ export function updateVoices() {
     <span class="vc-title">Voices &amp; Learning</span>
     <div class="vc-chips" role="tablist" aria-label="Voices">
       ${vs.list.map(v => `<button type="button" role="tab" aria-selected="${v.id === vs.activeId}"
-        class="tab-pill${v.id === vs.activeId ? ' active' : ''}" data-action="pick-voice-tab" data-id="${escapeAttr(v.id)}"
+        class="tab${v.id === vs.activeId ? ' active' : ''}" data-action="pick-voice-tab" data-id="${escapeAttr(v.id)}"
         title="${escapeAttr(v.description || v.name)}">${escapeHtml(v.name)}${v.proposal ? '<span class="pill-dot" aria-hidden="true"></span>' : ''}</button>`).join('')}
     </div>
     <span class="vc-spacer"></span>
