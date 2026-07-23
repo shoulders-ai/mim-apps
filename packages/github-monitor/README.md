@@ -5,14 +5,14 @@ and activity event across all repositories of an organization, with filtering,
 saved views, a board layout, an activity feed, and AI-written "who did what"
 summaries for any timeframe.
 
-## Install
+## Availability and activation
 
-Clone into your Mim workspace's `packages/` folder and enable it from the Apps UI:
+In the `mim-apps` checkout this directory is a Project app. It can be promoted
+to a Team source at `apps/github-monitor/` when it should be available across
+Projects, or copied to one Project at `packages/github-monitor/`.
 
-```sh
-cd {workspace}/packages
-git clone https://github.com/bitowaqr/mim-github-monitor github-monitor
-```
+Open **Settings > Apps & agents**, review its declared access, and enable it for
+the current Project.
 
 ## Setup
 
@@ -75,6 +75,6 @@ without network or Electron. See `docs/plan.md` for the full design.
 
 ## Docs
 
-- `docs/app.md` — user/operator documentation for installing, configuring,
+- `docs/app.md` — user/operator documentation for enabling, configuring,
   syncing, summaries, permissions, and troubleshooting.
 - `docs/plan.md` — original build plan and architecture notes.

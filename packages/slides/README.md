@@ -1,22 +1,16 @@
-# Slides Package
+# Slides
 
-Importable Mim package for drafting slide decks as paginated HTML and exporting PDF.
+Mim app for drafting slide decks as paginated HTML and exporting print-exact
+PDF.
 
-This package is intentionally outside the root `packages/` directory, so Mim does not load it as a bundled app. Install it by copying the folder into a package discovery directory:
+This directory is a Project app while developing in `mim-apps`. To share it
+across Projects, promote the whole directory to a Team source at
+`apps/slides/`. A Project can instead own a copy at `packages/slides/`.
 
-```bash
-mkdir -p "$WORKSPACE/packages"
-cp -R example-packages/slides "$WORKSPACE/packages/slides"
-```
-
-For a global install:
-
-```bash
-mkdir -p ~/.mim/packages
-cp -R example-packages/slides ~/.mim/packages/slides
-```
-
-After copying, restart or rescan packages in Mim. The copy must include the `shared/` directory (charts and model utilities used by the backend). The package depends on the core `render.htmlToPdf` tool, which is provided by the desktop app.
+After adding or editing the app, reload the app catalog, review its permissions,
+and enable it for the current Project. The copy must include `shared/`, which
+contains chart and model utilities used by the backend. Slides depends on the
+core `render.htmlToPdf` tool provided by Mim.
 
 ## Usage
 
@@ -34,9 +28,6 @@ slides/<slug>-<run>/
   deck-plan.json
 ```
 
-For a GitHub-backed workspace, prefer the workspace install and commit the
-copied `packages/slides/` directory in that workspace repo. That keeps the
-Slides app versioned with the customer workflow. Keep this
-`example-packages/slides/` directory as the canonical template source; do not
-move it into `~/mim-workspace` unless that directory is the workspace repo that
-should own an installed copy.
+Use a Project copy when Slides should evolve with one customer workflow. Use a
+Team copy when the same app version should be available across Projects.
+Availability and activation remain separate in both cases.

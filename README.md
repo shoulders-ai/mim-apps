@@ -1,8 +1,26 @@
 # Mim Apps
 
-Apps for [Mim](https://github.com/shoulders-ai/mim-os) — the operating system for AI-native research organisations.
+Reference apps for [Mim](https://github.com/shoulders-ai/mim-os), the operating
+system for AI-native research organisations.
 
-Browse and install from **Settings > Apps** inside Mim.
+This repository is the app authoring and runtime-compatibility catalog. It is
+not a Team source and Mim does not browse or install apps from a remote
+registry. Apps become available from one of Mim's three owned locations:
+
+```text
+Mim build resources/apps/<id>/
+Team source/apps/<id>/
+Project/packages/<id>/
+```
+
+Project overrides Team and Team overrides Mim when the same id exists more than
+once. Availability does not enable an app: every person reviews and enables
+apps locally for each Project.
+
+The private operational Team source is
+[shoulders-ai/mim-team](https://github.com/shoulders-ai/mim-team). Reusable app
+changes are authored and tested here, then promoted into that Team's `apps/`
+directory.
 
 ## Apps
 
@@ -18,29 +36,48 @@ Browse and install from **Settings > Apps** inside Mim.
 | **Scholar** | Reproducible literature search across PubMed, Europe PMC, arXiv, ClinicalTrials.gov, and more. |
 | **Slides** | Slide decks as paginated HTML with print-exact PDF export. |
 
-Each app has its own README under `packages/<id>/` with full documentation.
+Each app has its own README under `packages/<id>/`.
 
 ## Development
 
-Clone this repo and open it as your Mim workspace. Mim loads every `packages/<id>/` directory live — edits appear on reload.
+Clone this repository and open it as a Mim Project. Mim discovers each
+`packages/<id>/` directory as a Project app:
 
-```
+```text
 packages/<id>/
-  package.json        # mim manifest (id, views, backend, permissions, engines)
-  backend/            # backend entry (index.mjs) and modules
-  ui/                 # views referenced by the manifest
+  package.json        # Mim manifest
+  backend/            # optional backend entry and modules
+  ui/                 # optional views
+  skills/             # optional app-bundled skills
+  README.md            # app documentation shown in Mim
 ```
 
-### Publishing
+Use **Settings > Apps & agents** to review and enable an app in this checkout.
+After editing, validate and reload the app catalog.
 
-Push package changes to `main`. CI patch-bumps changed packages automatically, then regenerates `index.json`. For a minor or major release, edit `version` in `packages/<id>/package.json` before pushing; CI preserves that manual bump and only updates the registry.
+## Promotion
 
-Packages hosted in other repos can be added to `external.json`. The registry build merges them into `index.json` alongside local packages.
+Push reusable source changes to `main`. CI patch-bumps changed packages when
+needed and regenerates `index.json` as catalog and compatibility metadata. It
+is not an installation registry.
 
-### Tests
+To release an app through a Team source:
+
+1. make and test the change here;
+2. copy the intended `packages/<id>/` directory to the Team's `apps/<id>/`;
+3. review the Team repository diff;
+4. commit and push the Team promotion.
+
+Do not copy Project data folders such as `issues/` or `knowledge/`. App source
+and Project data are separate.
+
+## Tests
 
 ```bash
-npm install && npx vitest run
+npm install
+npm test
 ```
 
-Tests live next to source files (`packages/**/*.test.{mjs,ts}`). For runtime compatibility testing against the Mim core, see the [core repo](https://github.com/shoulders-ai/mim-os).
+Tests live next to source files (`packages/**/*.test.{mjs,ts}`). To verify this
+catalog against the current Mim runtime, run `npm run test:packages:compat` in
+the [Mim core repository](https://github.com/shoulders-ai/mim-os).

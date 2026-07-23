@@ -5,19 +5,14 @@ across all of its repositories. It indexes repositories, open issues, open pull
 requests, recently closed items, recent organization activity, ProjectsV2 board
 status, saved views, and AI-generated activity summaries.
 
-The app is intentionally not part of Mim core. It is installed as a package in a
-workspace and enabled from Mim's Apps UI.
+The app is intentionally not part of Mim core. Its source can be provided by a
+Team at `apps/github-monitor/` or by one Project at
+`packages/github-monitor/`.
 
-## Install
+## Enable
 
-Clone the package into a Mim workspace:
-
-```sh
-cd {workspace}/packages
-git clone https://github.com/bitowaqr/mim-github-monitor github-monitor
-```
-
-Then open Mim, go to Apps, enable GitHub Monitor, and open the GitHub view.
+Open **Settings > Apps & agents**, review GitHub Monitor's declared access,
+enable it for the current Project, and open the GitHub view.
 
 ## Setup
 
