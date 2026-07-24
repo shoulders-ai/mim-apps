@@ -35,6 +35,8 @@ directory.
 | **References** | Reference library with DOI, PDF, and paste capture. Grounded citation tools for the editor. |
 | **Scholar** | Reproducible literature search across PubMed, Europe PMC, arXiv, ClinicalTrials.gov, and more. |
 | **Slides** | Slide decks as paginated HTML with print-exact PDF export. |
+| **Word Count** | Headless example app for counting words, characters, and lines. |
+| **Word Count 2** | Second headless example for testing independent app identities. |
 
 Each app has its own README under `packages/<id>/`.
 
@@ -57,9 +59,9 @@ After editing, validate and reload the app catalog.
 
 ## Promotion
 
-Push reusable source changes to `main`. CI patch-bumps changed packages when
-needed and regenerates `index.json` as catalog and compatibility metadata. It
-is not an installation registry.
+Push reusable source changes to `main`. CI runs the app suite first,
+patch-bumps changed packages when needed, and regenerates `index.json` as
+catalog and compatibility metadata. It is not an installation registry.
 
 To release an app through a Team source:
 

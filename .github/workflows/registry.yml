@@ -1,16 +1,42 @@
-name: Update registry index
+name: Test and update catalog
 
 on:
   push:
     branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  update-index:
+  test:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm test -- --silent
+
+  update-index:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
       - name: Auto-bump versions for changed packages
         run: node scripts/auto-bump.mjs

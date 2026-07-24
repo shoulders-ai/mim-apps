@@ -5,9 +5,6 @@ node_modules/
 mim.yaml
 .DS_Store
 
-# Private apps
-packages/sf-crm/
-
 # Local test/runtime artifacts
 inputs/
 /references/
